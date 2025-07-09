@@ -2,8 +2,7 @@
 
 GMAO est une application web complète conçue pour la gestion et le suivi des actions de maintenance industrielle. Elle offre une interface intuitive et des outils puissants pour planifier, suivre et documenter toutes les interventions.
 
-![Aperçu du tableau de bord](https://via.placeholder.com/800x400.png?text=Aperçu+de+l'application+GMAO)
-*(Remplacez cette image par une capture d'écran de votre application)*
+![Aperçu du tableau de bord](./docs/images/Dashboard.png)
 
 ## Fonctionnalités principales
 
