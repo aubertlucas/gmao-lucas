@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMBAO - Configuration</title>
+    <!-- Bootstrap CSS -->
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="lib/bootstrap-icons/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+    <style>
+        .excel-config-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .excel-table-simulation {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+        
+        .pilotes-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+        }
+        
+        .pilote-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .pilote-item:last-child {
+            border-bottom: none;
+        }
+        
+        .editable-lieu[contenteditable="true"]:empty:before {
+            content: attr(placeholder);
+            color: #aaa;
+            font-style: italic;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        /* Améliorations visuelles pour le gestionnaire de calendrier */
+        .calendar-manager-container .card {
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .calendar-manager-container .card:hover {
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        }
+
+        .calendar-manager-container .card-header {
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-weight: 600;
+        }
+
+        .exceptions-list-container {
+            max-height: 450px; /* Limite la hauteur de la liste */
+            overflow-y: auto;   /* Ajoute une barre de défilement si nécessaire */
+            padding-right: 10px; /* Espace pour la barre de défilement */
+        }
+
+        /* Style de la barre de défilement pour les navigateurs Webkit */
+        .exceptions-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .exceptions-list-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .exceptions-list-container::-webkit-scrollbar-thumb {
+            background: #bdbdbd;
+            border-radius: 10px;
+        }
+        .exceptions-list-container::-webkit-scrollbar-thumb:hover {
+            background: #888;
+        }
+
+        /* Style pour les groupes d'exceptions */
+        .exception-group-row {
+            background-color: #f8f9fa;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .exception-group-row:hover {
+            background-color: #e9ecef;
+        }
+        .exception-child-row {
+            background-color: #ffffff;
+            display: none; /* Caché par défaut */
+        }
+        .exception-child-row.expanded {
+            display: table-row; /* Affiché quand le groupe est déplié */
+        }
+        .toggle-icon {
+            transition: transform 0.2s ease-in-out;
+        }
+        .expanded .toggle-icon {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="bi bi-gear-fill me-2"></i>GMAO</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="dashboard.html">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="actions.html">
+                            <i class="bi bi-list-task"></i> Actions
+                        </a>
+                    </li>
+                    <li class="nav-item" id="configMenuItem">
+                        <a class="nav-link active" href="admin.html">
+                            <i class="bi bi-gear"></i> Configuration
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" 
+                           role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> <span id="currentUser">Utilisateur</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="authManager.logout()">
+                                <i class="bi bi-box-arrow-right"></i> Déconnexion
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Message d'accès refusé pour les pilotes -->
+    <div id="accessDeniedAlert" class="container-fluid py-4" style="display: none;">
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Accès refusé</h4>
+            <p>Vous n'avez pas les autorisations nécessaires pour accéder à cette page.</p>
+            <hr>
+            <p class="mb-0">Veuillez contacter votre administrateur pour plus d'informations ou retourner au tableau de bord.</p>
+            <a href="dashboard.html" class="btn btn-outline-danger mt-3">
+                <i class="bi bi-arrow-left me-2"></i>Retourner au tableau de bord
+            </a>
+        </div>
+    </div>
+
+    <!-- Contenu de la page de configuration (masqué pour les pilotes) -->
+    <div id="configContent" class="container-fluid py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">Configuration du Système</h1>
+        </div>
+        
+        <!-- Configuration Content -->
+        <div id="configContainer" class="position-relative">
+            <!-- Section Tabs -->
+            <ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="lieux-tab" data-bs-toggle="tab" 
+                            data-bs-target="#lieux" type="button" role="tab">
+                        <i class="bi bi-geo-alt"></i> Lieux
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="users-tab" data-bs-toggle="tab" 
+                            data-bs-target="#users" type="button" role="tab">
+                        <i class="bi bi-people"></i> Utilisateurs
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="calendriers-tab" data-bs-toggle="tab" 
+                            data-bs-target="#calendriers" type="button" role="tab">
+                        <i class="bi bi-calendar-week"></i> Calendriers de Travail
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="system-tab" data-bs-toggle="tab"
+                            data-bs-target="#system" type="button" role="tab">
+                        <i class="bi bi-hdd-stack"></i> État du Système
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="compression-tab" data-bs-toggle="tab"
+                            data-bs-target="#compression" type="button" role="tab">
+                        <i class="bi bi-file-earmark-zip"></i> Compression Images
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="photos-tab" data-bs-toggle="tab" 
+                            data-bs-target="#photos" type="button" role="tab">
+                        <i class="bi bi-camera"></i> Paramètres Photos
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="diagnostic_user.html">
+                        <i class="bi bi-person-check-fill"></i> Diagnostic Utilisateur
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="configTabsContent">
+                <!-- Lieux Tab -->
+                <div class="tab-pane fade show active" id="lieux" role="tabpanel">
+                    <div class="card excel-config-section">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">📍 GESTION DES LIEUX</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Liste des lieux disponibles :</label>
+                                <div class="instructions-text small text-muted mb-2">
+                                    Instructions :<br>
+                                    1. Ajoutez, modifiez ou supprimez des lieux<br>
+                                    2. Les modifications seront automatiquement disponibles dans la liste déroulante des actions
+                                </div>
+                            </div>
+                            
+                            <div class="excel-table-simulation">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 30px; background: #4472C4; color: white;">A</th>
+                                            <th>Nom du lieu</th>
+                                            <th style="width: 50px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lieuxTableBody">
+                                        <!-- Will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Utilisateurs Tab -->
+                <div class="tab-pane fade" id="users" role="tabpanel">
+                    <div class="card excel-config-section">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">👥 GESTION DES COMPTES UTILISATEURS</h5>
+                        </div>
+                        <div class="card-body">
+                            <label class="form-label">Liste des utilisateurs :</label>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> Les utilisateurs sont classés par rôle (Admin, Manager, Pilote, Observateur).
+                            </div>
+                            <div class="pilotes-list mb-3" id="usersList">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                            
+                            <!-- Formulaire d'ajout de pilote -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Ajouter un nouvel utilisateur</h6>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Explication des rôles -->
+                                    <div class="alert alert-info mb-3">
+                                        <h6><i class="bi bi-info-circle"></i> Rôles disponibles :</h6>
+                                        <ul class="mb-0">
+                                            <li><strong>Admin</strong> : Accès complet à toutes les fonctionnalités (gestion des utilisateurs, configuration, actions)</li>
+                                            <li><strong>Manager</strong> : Peut gérer les actions et les pilotes, mais pas les paramètres système</li>
+                                            <li><strong>Pilote</strong> : Peut être assigné à des actions et commenter celle-ci</li>
+                                            <li><strong>Observateur</strong> : Accès en lecture seule aux actions et au dashboard</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <form id="addPiloteForm" class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Nom complet*</label>
+                                            <input type="text" class="form-control" id="newPiloteName" placeholder="Nom complet de l'utilisateur" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Email*</label>
+                                            <input type="email" class="form-control" id="newPiloteEmail" placeholder="Email de l'utilisateur" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Mot de passe*</label>
+                                            <input type="password" class="form-control" id="newPilotePassword" placeholder="Mot de passe" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Confirmation du mot de passe*</label>
+                                            <input type="password" class="form-control" id="newPilotePasswordConfirm" placeholder="Confirmer le mot de passe" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Rôle*</label>
+                                            <select class="form-select" id="newUserRole" required>
+                                                <option value="pilot" selected>Pilote</option>
+                                                <option value="manager">Manager</option>
+                                                <option value="observer">Observateur</option>
+                                                <option value="admin">Administrateur</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 text-end">
+                                            <button type="button" class="btn btn-success" id="addUserButton">
+                                                <i class="bi bi-plus"></i> Créer l'utilisateur
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Calendriers Tab -->
+                <div class="tab-pane fade" id="calendriers" role="tabpanel">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">📅 GESTION AVANCÉE DES CALENDRIERS</h5>
+                            <div>
+                                <select class="form-select form-select-sm" id="calendarUserSelect">
+                                    <!-- Sera rempli par le JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="calendarContainer">
+                                <!-- Le composant CalendarManager sera chargé ici -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- System Status Tab -->
+                <div class="tab-pane fade" id="system" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="bi bi-hdd-stack"></i> État du Stockage</h5>
+                        </div>
+                        <div class="card-body" id="storageInfoContainer">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                                <p class="mt-2">Chargement des informations de stockage...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Image Compression Tab -->
+                <div class="tab-pane fade" id="compression" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="bi bi-file-earmark-zip"></i> Outil de Compression des Images</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning">
+                                <strong>Attention:</strong> La compression est une opération destructive qui remplace les images originales. Il est fortement recommandé de faire une sauvegarde complète du dossier <code>backend/uploads</code> avant de procéder.
+                            </div>
+
+                            <h6 class="card-title">Étape 1: Prévisualiser la compression</h6>
+                            <p>Sélectionnez une image d'exemple pour prévisualiser l'effet de la compression à différentes qualités.</p>
+                            
+                            <div class="mb-3">
+                                <label for="image-preview-select" class="form-label">Choisir une image d'exemple:</label>
+                                <select class="form-select" id="image-preview-select">
+                                    <option value="">Chargement des images...</option>
+                                </select>
+                            </div>
+
+                            <div id="preview-area" class="mt-3" style="display: none;">
+                                <div class="mb-3">
+                                    <label for="quality-slider" class="form-label">Qualité de compression: <strong id="quality-value">75</strong></label>
+                                    <input type="range" class="form-range" min="10" max="95" step="5" value="75" id="quality-slider">
+                                </div>
+                                <div class="row text-center">
+                                    <div class="col-md-6">
+                                        <h6>Originale</h6>
+                                        <img id="original-preview" src="" alt="Aperçu original" class="img-fluid rounded border">
+                                        <p class="mt-2">Taille: <strong id="original-size"></strong></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Compressée</h6>
+                                        <img id="compressed-preview" src="" alt="Aperçu compressé" class="img-fluid rounded border">
+                                        <p class="mt-2">Taille: <strong id="compressed-size"></strong></p>
+                                        <p class="mt-1">Économie: <strong id="space-saving"></strong></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-4">
+
+                            <h6 class="card-title">Étape 2: Appliquer la compression à toutes les images</h6>
+                            <p>Cette action va compresser <strong>toutes les images (JPG/PNG)</strong> du dossier <code>uploads/photos</code> avec la qualité sélectionnée ci-dessus.</p>
+                            <button id="compress-all-btn" class="btn btn-danger" disabled>
+                                <i class="bi bi-exclamation-triangle-fill"></i> Lancer la compression globale
+                            </button>
+                        </div>
+                        <div class="card-footer" id="compression-results" style="display: none;">
+                            <!-- Results will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Photos Tab -->
+                <div class="tab-pane fade" id="photos" role="tabpanel">
+                    <div class="card excel-config-section">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">📷 PARAMÈTRES DES PHOTOS</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <label class="col-sm-4 col-form-label">Dossier des photos:</label>
+                                <div class="col-sm-8">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="photosFolder" 
+                                               placeholder="C:\Chemin\Vers\Photos ou uploads/photos">
+                                        <button class="btn btn-outline-secondary" onclick="configManager.selectPhotosFolder()">
+                                            Parcourir...
+                                        </button>
+                                    </div>
+                                    <div class="form-text text-muted small">
+                                        Vous pouvez utiliser un chemin Windows complet (C:\Dossier\Photos) ou un chemin relatif (uploads/photos)
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-sm-8 offset-sm-4">
+                                    <button class="btn btn-outline-info" onclick="configManager.refreshPhotos()">
+                                        Rafraîchir les photos
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Save Buttons -->
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <div class="btn-group mb-4">
+                        <button class="btn btn-success btn-lg" onclick="configManager.saveConfiguration()">
+                            <i class="bi bi-check-circle"></i> Sauvegarder la Configuration
+                        </button>
+                    </div>
+                    
+                    <!-- Data Reset Button -->
+                    <div class="mt-4">
+                        <button class="btn btn-danger btn-lg" id="resetAppDataBtn">
+                            <i class="bi bi-exclamation-triangle"></i> Réinitialiser toutes les données de l'application
+                        </button>
+                        <div class="text-muted mt-2">
+                            <small>Cette action supprimera toutes les actions, exceptions de calendrier et horaires de travail, mais préservera les utilisateurs et mots de passe.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+    
+    <!-- Modal pour réinitialiser le mot de passe -->
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="resetPasswordModalLabel">
+                        <i class="bi bi-key"></i> Réinitialiser le mot de passe
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        Vous êtes sur le point de réinitialiser le mot de passe de <strong id="resetPasswordUserName"></strong>.
+                    </p>
+                    <form id="resetPasswordForm">
+                        <input type="hidden" id="resetPasswordUserId">
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">Nouveau mot de passe</label>
+                            <input type="password" class="form-control" id="newPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmNewPassword" class="form-label">Confirmer le mot de passe</label>
+                            <input type="password" class="form-control" id="confirmNewPassword" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-warning" id="resetPasswordButton" onclick="configManager.resetUserPassword()">
+                        <i class="bi bi-key"></i> Réinitialiser le mot de passe
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap and application scripts -->
+    <script src="lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js?v=20250612_0832_USERS"></script>
+    <script src="js/utils/userManager.js?v=20250612_0832"></script>
+    <script src="js/components/ConfigManager.v2.js?v=20250612_0832_USERS"></script>
+    <script src="js/components/CalendarManager.js?v=20250603_FINAL_FIX2"></script>
+    
+    <script>
+        // Vérifier le rôle de l'utilisateur et contrôler l'accès à la page
+        document.addEventListener('DOMContentLoaded', function() {
+            const userRole = authManager.getUserRole();
+            const configMenuItem = document.getElementById('configMenuItem');
+            const accessDeniedAlert = document.getElementById('accessDeniedAlert');
+            const configContent = document.getElementById('configContent');
+            
+            // Si l'utilisateur est un pilote, masquer l'élément de configuration et le contenu
+            if (userRole === 'pilot') {
+                if (configMenuItem) {
+                    configMenuItem.style.display = 'none';
+                }
+                
+                if (accessDeniedAlert && configContent) {
+                    accessDeniedAlert.style.display = 'block';
+                    configContent.style.display = 'none';
+                    console.log('[GMAO] Accès à la configuration refusé pour les pilotes');
+                }
+            }
+        });
+        
+        // Fonction de réinitialisation des données de l'application
+        async function resetApplicationData() {
+            // Confirmation avec un double check pour éviter les accidents
+            if (!confirm('ATTENTION: Cette action va supprimer TOUTES les données de l\'application, y compris toutes les actions, exceptions de calendrier et horaires de travail.\n\nLes utilisateurs et mots de passe seront conservés.\n\nVoulez-vous continuer ?')) {
+                return;
+            }
+            
+            // Deuxième confirmation
+            if (!confirm('CONFIRMATION FINALE: Êtes-vous vraiment sûr de vouloir réinitialiser toutes les données ?\n\nCette action est irréversible.')) {
+                return;
+            }
+            
+            try {
+                showLoading();
+                
+                // Appel à l'endpoint API
+                const apiService = new ApiService();
+                const response = await apiService.request('/config/reset-application-data', {
+                    method: 'POST',
+                    body: JSON.stringify({})
+                });
+                
+                if (response && response.message) {
+                    showToast(response.message, 'success');
+                    
+                    // Recharger la page pour réfléter les changements
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la réinitialisation des données:', error);
+                showToast('Erreur lors de la réinitialisation des données. Vérifiez la console pour plus de détails.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // Fonction pour afficher l'indicateur de chargement
+        function showLoading() {
+            let loadingOverlay = document.querySelector('.loading-overlay');
+            if (!loadingOverlay) {
+                loadingOverlay = document.createElement('div');
+                loadingOverlay.className = 'loading-overlay';
+                loadingOverlay.innerHTML = `
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                `;
+                document.body.appendChild(loadingOverlay);
+            }
+            loadingOverlay.style.display = 'flex';
+        }
+        
+        // Fonction pour masquer l'indicateur de chargement
+        function hideLoading() {
+            const loadingOverlay = document.querySelector('.loading-overlay');
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'none';
+            }
+        }
+
+        // Initialize config manager and calendar manager
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Function to fetch and display storage info
+            const loadStorageInfo = async () => {
+                const container = document.getElementById('storageInfoContainer');
+                try {
+                    const api = new ApiService();
+                    const data = await api.request('/admin/storage-info');
+
+                    const formatBytes = (bytes, decimals = 2) => {
+                        if (bytes === 0) return '0 Octets';
+                        const k = 1024;
+                        const dm = decimals < 0 ? 0 : decimals;
+                        const sizes = ['Octets', 'Ko', 'Mo', 'Go', 'To', 'Po'];
+                        const i = Math.floor(Math.log(bytes) / Math.log(k));
+                        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+                    };
+
+                    const totalFormatted = formatBytes(data.total_disk_space);
+                    const usedFormatted = formatBytes(data.used_disk_space);
+                    const freeFormatted = formatBytes(data.free_disk_space);
+                    const uploadsFormatted = formatBytes(data.uploads_folder_size);
+                    const usedPercentage = ((data.used_disk_space / data.total_disk_space) * 100).toFixed(2);
+
+                    container.innerHTML = `
+                        <h6 class="card-title">Utilisation du Disque</h6>
+                        <p>Espace total: <strong>${totalFormatted}</strong></p>
+                        <div class="progress mb-3" style="height: 25px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: ${usedPercentage}%;" 
+                                 aria-valuenow="${usedPercentage}" aria-valuemin="0" aria-valuemax="100">
+                                ${usedFormatted} utilisés (${usedPercentage}%)
+                            </div>
+                        </div>
+                        <p>Espace disponible: <strong class="text-success">${freeFormatted}</strong></p>
+                        <hr>
+                        <h6 class="card-title mt-4">Taille du Dossier des Photos</h6>
+                        <p>Taille totale des images: <strong>${uploadsFormatted}</strong></p>
+                        <p>Pourcentage de l'espace disque total: <strong>${data.uploads_percentage_of_disk}%</strong></p>
+                    `;
+                } catch (error) {
+                    container.innerHTML = `<div class="alert alert-danger">Erreur lors du chargement des informations de stockage: ${error.message}</div>`;
+                }
+            };
+
+            // Image Compression Logic
+            const initImageCompression = () => {
+                const imageSelect = document.getElementById('image-preview-select');
+                const previewArea = document.getElementById('preview-area');
+                const qualitySlider = document.getElementById('quality-slider');
+                const qualityValue = document.getElementById('quality-value');
+                const originalPreview = document.getElementById('original-preview');
+                const originalSize = document.getElementById('original-size');
+                const compressedPreview = document.getElementById('compressed-preview');
+                const compressedSize = document.getElementById('compressed-size');
+                const spaceSaving = document.getElementById('space-saving');
+                const compressAllBtn = document.getElementById('compress-all-btn');
+                const resultsContainer = document.getElementById('compression-results');
+                
+                let selectedFilePath = null;
+                const api = new ApiService();
+
+                const formatBytes = (bytes, decimals = 2) => {
+                    if (!bytes || bytes === 0) return '0 Octets';
+                    const k = 1024;
+                    const dm = decimals < 0 ? 0 : decimals;
+                    const sizes = ['Octets', 'Ko', 'Mo', 'Go', 'To', 'Po'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+                };
+
+                const updatePreview = async () => {
+                    if (!selectedFilePath) return;
+
+                    const quality = qualitySlider.value;
+                    qualityValue.textContent = quality;
+                    compressedPreview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+
+                    try {
+                        const data = await api.request('/admin/compress-preview', {
+                            method: 'POST',
+                            body: JSON.stringify({ file_path: selectedFilePath, quality: parseInt(quality) })
+                        });
+                        
+                        // Use the original size sent directly by the API
+                        originalSize.textContent = formatBytes(data.original_size);
+                        
+                        compressedPreview.src = data.compressed_image_data_url;
+                        compressedSize.textContent = formatBytes(data.compressed_size);
+                        
+                        const saving = data.original_size - data.compressed_size;
+                        const savingPercent = data.original_size > 0 ? ((saving / data.original_size) * 100).toFixed(1) : 0;
+                        spaceSaving.textContent = `${formatBytes(saving)} (${savingPercent}%)`;
+
+                    } catch (error) {
+                        showToast(`Erreur de prévisualisation: ${error.message}`, 'error');
+                        compressedPreview.src = '';
+                    }
+                };
+
+                const loadSampleImages = async () => {
+                    try {
+                        const imagePaths = await api.request('/admin/sample-images');
+                        imageSelect.innerHTML = '<option value="">-- Sélectionnez une image --</option>';
+                        if (imagePaths.length === 0) {
+                            imageSelect.innerHTML = '<option value="">Aucune image trouvée</option>';
+                            imageSelect.disabled = true;
+                            return;
+                        }
+                        imagePaths.forEach(path => {
+                            const option = document.createElement('option');
+                            option.value = path;
+                            option.textContent = path.split('/').pop();
+                            imageSelect.appendChild(option);
+                        });
+                    } catch (error) {
+                        showToast('Erreur de chargement des images d\'exemple.', 'error');
+                    }
+                };
+
+                imageSelect.addEventListener('change', (event) => {
+                    selectedFilePath = event.target.value;
+                    if (selectedFilePath) {
+                        // Build the absolute URL to the backend's media serving endpoint
+                        originalPreview.src = `${api.baseURL}/photos/media/${selectedFilePath}`;
+                        previewArea.style.display = 'block';
+                        compressAllBtn.disabled = false;
+                        updatePreview();
+                    } else {
+                        previewArea.style.display = 'none';
+                        compressAllBtn.disabled = true;
+                    }
+                });
+
+                qualitySlider.addEventListener('input', () => { qualityValue.textContent = qualitySlider.value; });
+                qualitySlider.addEventListener('change', updatePreview);
+
+                compressAllBtn.addEventListener('click', async () => {
+                    const quality = qualitySlider.value;
+                    if (!confirm(`Vous êtes sur le point de compresser TOUTES les images avec une qualité de ${quality}. Cette action est IRRÉVERSIBLE. Continuer ?`)) {
+                        return;
+                    }
+                    compressAllBtn.disabled = true;
+                    compressAllBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Compression en cours...';
+                    resultsContainer.style.display = 'block';
+                    resultsContainer.innerHTML = '<div class="text-center">Traitement en cours, veuillez patienter...</div>';
+                    
+                    try {
+                        const data = await api.request('/admin/compress-all-images', {
+                            method: 'POST',
+                            body: JSON.stringify({ quality: parseInt(quality) })
+                        });
+                        let resultHTML = `<p><strong>Opération terminée !</strong></p><ul>
+                                <li>Fichiers traités: ${data.processed_files}</li>
+                                <li>Taille totale avant: ${formatBytes(data.total_size_before)}</li>
+                                <li>Taille totale après: ${formatBytes(data.total_size_after)}</li>
+                                <li class="text-success"><strong>Espace économisé: ${formatBytes(data.space_saved)}</strong></li></ul>`;
+                        if (data.errors && data.errors.length > 0) {
+                            resultHTML += `<p class="text-danger"><strong>Erreurs:</strong></p><ul>${data.errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+                        }
+                        resultsContainer.innerHTML = resultHTML;
+                    } catch (error) {
+                        resultsContainer.innerHTML = `<p class="text-danger"><strong>Erreur:</strong> ${error.message}</p>`;
+                    } finally {
+                        compressAllBtn.disabled = false;
+                        compressAllBtn.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> Lancer la compression globale';
+                    }
+                });
+
+                // Load initial data
+                loadSampleImages();
+            };
+
+            // Load storage info when the system tab is shown
+            const systemTab = document.querySelector('#system-tab');
+            if (systemTab) {
+                systemTab.addEventListener('shown.bs.tab', loadStorageInfo);
+                if (systemTab.classList.contains('active')) {
+                    loadStorageInfo();
+                }
+            }
+            
+            // Initialize image compression tab logic
+            initImageCompression();
+
+            // Restaurer l'onglet actuel après rechargement
+            const savedActiveTab = localStorage.getItem('calendarActiveTab');
+            if (savedActiveTab) {
+                console.log('[ADMIN] Restauration de l\'onglet:', savedActiveTab);
+                const tabEl = document.querySelector(`button[data-bs-target="${savedActiveTab}"]`);
+                if (tabEl) {
+                    const tab = new bootstrap.Tab(tabEl);
+                    tab.show();
+                }
+            }
+            
+            // Vérifier le rôle de l'utilisateur et appliquer les restrictions d'accès
+            try {
+                const userRole = await authManager.getUserRole();
+                
+                // Restrictions pour les pilotes et observateurs
+                if (userRole === 'pilot' || userRole === 'observer') {
+                    // Masquer le contenu de configuration pour les pilotes et observateurs
+                    document.getElementById('configContent').innerHTML = `
+                        <div class="alert alert-danger">
+                            <h4><i class="bi bi-exclamation-triangle-fill"></i> Accès restreint</h4>
+                            <p>En tant que ${userRole === 'pilot' ? 'pilote' : 'observateur'}, vous n'avez pas accès à la section de configuration.</p>
+                            <a href="dashboard.html" class="btn btn-primary">Retourner au tableau de bord</a>
+                        </div>
+                    `;
+                }
+                
+                // Restrictions pour les managers
+                if (userRole === 'manager') {
+                    // Masquer l'onglet Utilisateurs
+                    const usersTab = document.querySelector('#users-tab');
+                    if (usersTab) {
+                        usersTab.closest('li').style.display = 'none';
+                    }
+                    
+                    // Masquer l'onglet Paramètres Photos
+                    const photosTab = document.querySelector('#photos-tab');
+                    if (photosTab) {
+                        photosTab.closest('li').style.display = 'none';
+                    }
+                    
+                    // Si l'onglet actif est l'un des onglets masqués, rediriger vers l'onglet Lieux
+                    const activeTabId = document.querySelector('.tab-pane.active')?.id;
+                    if (activeTabId === 'users' || activeTabId === 'photos') {
+                        const tab = new bootstrap.Tab(document.querySelector('#lieux-tab'));
+                        tab.show();
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur lors de la vérification du rôle utilisateur:', error);
+            }
+                
+                // Désactiver tous les onglets
+                document.querySelectorAll('.nav-tabs .nav-link').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-pane').forEach(pane => {
+                    pane.classList.remove('active', 'show');
+                });
+                
+                // Activer l'onglet sauvegardé
+                const tabToActivate = document.getElementById(savedActiveTab);
+                if (tabToActivate) {
+                    tabToActivate.classList.add('active');
+                    const targetPaneId = tabToActivate.getAttribute('data-bs-target');
+                    if (targetPaneId) {
+                        const paneToActivate = document.querySelector(targetPaneId);
+                        if (paneToActivate) {
+                            paneToActivate.classList.add('active', 'show');
+                        }
+                    }
+                }
+                
+                // Nettoyer le localStorage
+                localStorage.removeItem('calendarActiveTab');
+            
+            // Initialize config manager
+            window.configManager = new ConfigManager();
+            await configManager.init();
+            
+            try {
+                // Utiliser le gestionnaire d'utilisateurs centralisé
+                const userSelect = document.getElementById('calendarUserSelect');
+                if (userSelect) {
+                    // Remplir le sélecteur avec les utilisateurs de manière cohérente
+                    await window.userManager.populateUserSelect(userSelect, false, "Non assigné", null, true);
+                    
+                    // Initialiser le gestionnaire de calendrier avec le premier utilisateur
+                    if (userSelect.options.length > 0) {
+                        const firstUserId = userSelect.options[0].value;
+                        
+                        // Vérifier que l'ID est valide avant d'initialiser
+                        if (firstUserId && !isNaN(parseInt(firstUserId))) {
+                            // Créer une instance globale propre du gestionnaire de calendrier
+                            console.log('[ADMIN] Création d\'une instance CalendarManager propre pour utilisateur', firstUserId);
+                            window.calendarManagerInstance = new CalendarManager(new ApiService());
+                            await window.calendarManagerInstance.init('calendarContainer', parseInt(firstUserId));
+                        
+                            // Gérer le changement d'utilisateur avec validation de l'ID
+                            userSelect.addEventListener('change', async (e) => {
+                                const selectedUserId = e.target.value;
+                                
+                                // Valider l'ID avant de l'utiliser
+                                if (selectedUserId && !isNaN(parseInt(selectedUserId))) {
+                                    // DÉTRUIRE complètement l'instance précédente avant d'en créer une nouvelle
+                                    if (window.calendarManagerInstance) {
+                                        console.log('[ADMIN] Destruction complète de l\'instance CalendarManager précédente');
+                                        try {
+                                            window.calendarManagerInstance.destroy();
+                                        } catch (error) {
+                                            console.warn('[ADMIN] Erreur lors de la destruction:', error);
+                                        }
+                                        window.calendarManagerInstance = null;
+                                    }
+                                    
+                                    // Créer une NOUVELLE instance complètement propre
+                                    console.log('[ADMIN] Création d\'une nouvelle instance CalendarManager pour utilisateur', selectedUserId);
+                                    window.calendarManagerInstance = new CalendarManager(new ApiService());
+                                    await window.calendarManagerInstance.init('calendarContainer', parseInt(selectedUserId));
+                                } else {
+                                    console.error('ID utilisateur invalide sélectionné:', selectedUserId);
+                                    // Afficher un message d'erreur à l'utilisateur
+                                    document.getElementById('calendarContainer').innerHTML = 
+                                        '<div class="alert alert-danger">Erreur: ID utilisateur invalide sélectionné.</div>';
+                                }
+                            });
+                        } else {
+                            console.error('ID du premier utilisateur invalide:', firstUserId);
+                            document.getElementById('calendarContainer').innerHTML = 
+                                '<div class="alert alert-danger">Erreur: Impossible de charger le calendrier avec l\'ID utilisateur fourni.</div>';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                showToast('Erreur lors du chargement des utilisateurs', 'error');
+            }
+            
+            // Ajouter un écouteur d'événement pour le bouton de réinitialisation
+            document.getElementById('resetAppDataBtn').addEventListener('click', resetApplicationData);
+        });
+    </script>
+</body>
+</html>

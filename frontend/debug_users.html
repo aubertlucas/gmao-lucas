@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Base de données utilisateurs</title>
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/css/bootstrap-icons.css">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,.1);
+        }
+        .card-header {
+            font-weight: bold;
+        }
+        .card-admin .card-header {
+            background-color: #dc3545;
+            color: white;
+        }
+        .card-manager .card-header {
+            background-color: #fd7e14;
+            color: white;
+        }
+        .card-pilot .card-header {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .card-observer .card-header {
+            background-color: #198754;
+            color: white;
+        }
+        .user-count {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-left: 10px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .debug-tools {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        .inactive-user {
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card debug-tools">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0"><i class="bi bi-bug"></i> Page de Debug - Base de données utilisateurs</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Actions rapides</h5>
+                            <div>
+                                <button id="refreshBtn" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> Rafraîchir les données</button>
+                                <a href="admin.html" class="btn btn-secondary ms-2"><i class="bi bi-gear"></i> Retour à l'admin</a>
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Cette page affiche tous les utilisateurs de la base de données, regroupés par rôle.
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="showRawData">
+                            <label class="form-check-label" for="showRawData">Afficher les données brutes (JSON)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4" id="rawDataContainer" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Données brutes (JSON)</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre id="rawData">Chargement des données...</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Admin users -->
+            <div class="col-md-6 mb-4">
+                <div class="card card-admin">
+                    <div class="card-header">
+                        <i class="bi bi-shield-lock"></i> Administrateurs <span id="adminCount" class="badge bg-light text-dark user-count">0</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul id="adminUsers" class="list-group list-group-flush">
+                            <li class="list-group-item text-center">Chargement...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manager users -->
+            <div class="col-md-6 mb-4">
+                <div class="card card-manager">
+                    <div class="card-header">
+                        <i class="bi bi-briefcase"></i> Managers <span id="managerCount" class="badge bg-light text-dark user-count">0</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul id="managerUsers" class="list-group list-group-flush">
+                            <li class="list-group-item text-center">Chargement...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pilot users -->
+            <div class="col-md-6 mb-4">
+                <div class="card card-pilot">
+                    <div class="card-header">
+                        <i class="bi bi-person-badge"></i> Pilotes <span id="pilotCount" class="badge bg-light text-dark user-count">0</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul id="pilotUsers" class="list-group list-group-flush">
+                            <li class="list-group-item text-center">Chargement...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Observer users -->
+            <div class="col-md-6 mb-4">
+                <div class="card card-observer">
+                    <div class="card-header">
+                        <i class="bi bi-eye"></i> Observateurs <span id="observerCount" class="badge bg-light text-dark user-count">0</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul id="observerUsers" class="list-group list-group-flush">
+                            <li class="list-group-item text-center">Chargement...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js?v=20250612_0844_DEBUG"></script>
+    <script>
+        // Variable to store all users data
+        let allUsers = [];
+
+        // Function to format user data for display
+        function formatUserDetails(user) {
+            return `
+                <div class="d-flex justify-content-between ${!user.is_active ? 'inactive-user' : ''}">
+                    <div>
+                        <strong>${user.username}</strong> 
+                        ${!user.is_active ? '<span class="badge bg-secondary">Inactif</span>' : ''}
+                        <br>
+                        <small class="text-muted">ID: ${user.id}</small>
+                    </div>
+                    <div>
+                        <span class="badge ${user.is_active ? 'bg-success' : 'bg-secondary'}">
+                            ${user.is_active ? 'Actif' : 'Inactif'}
+                        </span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Function to load and display users
+        async function loadUsers() {
+            try {
+                // Show loading state
+                document.querySelectorAll('#adminUsers, #managerUsers, #pilotUsers, #observerUsers').forEach(el => {
+                    el.innerHTML = '<li class="list-group-item text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Chargement...</li>';
+                });
+
+                // Fetch users from API
+                allUsers = await apiService.getUsers();
+                
+                // Display raw data if option is checked
+                document.getElementById('rawData').textContent = JSON.stringify(allUsers, null, 2);
+                
+                // Group users by role
+                const adminUsers = allUsers.filter(user => user.role === 'admin');
+                const managerUsers = allUsers.filter(user => user.role === 'manager');
+                const pilotUsers = allUsers.filter(user => user.role === 'pilot');
+                const observerUsers = allUsers.filter(user => user.role === 'observer');
+                
+                // Update counters
+                document.getElementById('adminCount').textContent = adminUsers.length;
+                document.getElementById('managerCount').textContent = managerUsers.length;
+                document.getElementById('pilotCount').textContent = pilotUsers.length;
+                document.getElementById('observerCount').textContent = observerUsers.length;
+                
+                // Display users by role
+                displayUsersByRole('adminUsers', adminUsers);
+                displayUsersByRole('managerUsers', managerUsers);
+                displayUsersByRole('pilotUsers', pilotUsers);
+                displayUsersByRole('observerUsers', observerUsers);
+            } catch (error) {
+                console.error('Erreur lors du chargement des utilisateurs:', error);
+                document.querySelectorAll('#adminUsers, #managerUsers, #pilotUsers, #observerUsers').forEach(el => {
+                    el.innerHTML = `<li class="list-group-item text-danger"><i class="bi bi-exclamation-triangle"></i> Erreur: ${error.message || 'Impossible de charger les utilisateurs'}</li>`;
+                });
+            }
+        }
+        
+        // Function to display users by role
+        function displayUsersByRole(containerId, users) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            if (users.length === 0) {
+                container.innerHTML = '<li class="list-group-item text-center text-muted">Aucun utilisateur</li>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.innerHTML = formatUserDetails(user);
+                container.appendChild(li);
+            });
+        }
+
+        // Toggle raw data display
+        document.getElementById('showRawData').addEventListener('change', function() {
+            document.getElementById('rawDataContainer').style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Refresh button handler
+        document.getElementById('refreshBtn').addEventListener('click', loadUsers);
+
+        // Authentication check
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!authManager.isAuthenticated()) {
+                window.location.href = 'login.html?redirect=' + encodeURIComponent(window.location.href);
+            } else {
+                // Load users when authenticated
+                loadUsers();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMBAO - Diagnostic Utilisateur</title>
+    <!-- Bootstrap CSS -->
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="lib/bootstrap-icons/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+    <style>
+        .status-overdue {
+            background-color: #f8d7da !important; /* Rouge clair pour le retard */
+            color: #721c24;
+        }
+        .status-on-time {
+            background-color: #d4edda !important; /* Vert clair pour à l'heure */
+            color: #155724;
+        }
+        .status-completed {
+            background-color: #e2e3e5 !important; /* Gris pour terminé */
+        }
+         .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="bi bi-gear-fill me-2"></i>GMBAO</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item" id="nav-dashboard">
+                        <a class="nav-link" href="dashboard.html">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="actions.html">
+                            <i class="bi bi-list-task"></i> Actions
+                        </a>
+                    </li>
+                    <li class="nav-item" id="nav-config">
+                        <a class="nav-link" href="admin.html">
+                            <i class="bi bi-gear"></i> Configuration
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" 
+                           role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> <span id="currentUser">Utilisateur</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="authManager.logout()">
+                                <i class="bi bi-box-arrow-right"></i> Déconnexion
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <h1 class="h3 mb-4">Diagnostic des Actions par Utilisateur</h1>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label for="userSelector" class="form-label">Sélectionner un utilisateur :</label>
+                        <select id="userSelector" class="form-select"></select>
+                    </div>
+                     <div class="col-md-4">
+                        <button id="refreshAllBtn" class="btn btn-primary mt-4" style="display: none;">
+                            <i class="bi bi-arrow-clockwise"></i> Rafraîchir toutes les actions
+                        </button>
+                    </div>
+                    <div class="col-md-8" id="statsContainer">
+                        <!-- Les statistiques seront injectées ici -->
+                    </div>
+                </div>
+            </div>
+            <div class="card-body position-relative">
+                 <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>N°</th>
+                                <th>Titre</th>
+                                <th>Date Planifiée</th>
+                                <th>Date Fin Prévue</th>
+                                <th>Date Réalisation</th>
+                                <th>Statut Final</th>
+                                <th>Statut Retard</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="diagnosticActionsTable">
+                            <!-- Les lignes d'actions seront injectées ici -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+    
+    <!-- Scripts -->
+    <script src="lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/dateUtils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/diagnostic_user.js"></script>
+</body>
+</html> 

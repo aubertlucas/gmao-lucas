@@ -1,0 +1,14 @@
+# Fichiers temporaires
+*.tmp
+*.log
+*.swp
+*.bak
+
+# Dossiers cache
+.cache/
+__pycache__/
+node_modules/
+
+# Fichiers système
+.DS_Store
+Thumbs.db

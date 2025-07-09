@@ -1,0 +1,34 @@
+/* Styles pour l'application GMAO */
+
+/* Style pour mettre en évidence les nouvelles actions */
+.highlight-new {
+    animation: highlight-animation 3s ease-in-out;
+}
+
+@keyframes highlight-animation {
+    0% { background-color: rgba(25, 135, 84, 0.1); }
+    50% { background-color: rgba(25, 135, 84, 0.3); }
+    100% { background-color: transparent; }
+}
+
+/* Styles pour l'éditeur de cellules */
+.editor-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.editor-input {
+    flex-grow: 1;
+}
+
+/* Styles pour le tableau d'actions */
+.excel-cell.editing {
+    padding: 0;
+}
+
+/* Autres styles personnalisés */
+.currency-value, .time-value, .date-value {
+    text-align: right;
+    display: block;
+}

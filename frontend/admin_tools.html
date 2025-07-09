@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outils d'Administration</title>
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="lib/bootstrap-icons/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Le layout par défaut (navbar, etc.) sera injecté ici -->
+    </div>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                
+                <h2 class="mb-4"><i class="bi bi-tools"></i> Outils d'Administration</h2>
+
+                <div class="card">
+                    <div class="card-header">
+                        Migrations de Données
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Recalculer les indicateurs de retard</h5>
+                        <p class="card-text">
+                            Cet outil recalcule l'indicateur "terminé en retard" pour toutes les actions déjà complétées.
+                            Une sauvegarde de la base de données sera automatiquement créée avant toute modification.
+                        </p>
+                        <button id="run-migration-btn" class="btn btn-primary">
+                            <i class="bi bi-play-circle"></i> Lancer la migration
+                        </button>
+                    </div>
+                </div>
+
+                <div id="results-container" class="mt-4" style="display: none;">
+                    <h4>Résultats de l'opération</h4>
+                    <pre id="results-log" class="bg-dark text-white p-3 rounded" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/default-layout.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const authManager = new AuthManager();
+            if (!authManager.isAuthenticated() || authManager.getUserRole() !== 'admin') {
+                // Rediriger si non admin ou non authentifié
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const runBtn = document.getElementById('run-migration-btn');
+            const resultsContainer = document.getElementById('results-container');
+            const resultsLog = document.getElementById('results-log');
+
+            runBtn.addEventListener('click', async () => {
+                if (!confirm("Êtes-vous sûr de vouloir lancer cette migration ? Cette opération peut prendre quelques instants.")) {
+                    return;
+                }
+
+                // Afficher le chargement et les résultats
+                runBtn.disabled = true;
+                runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Migration en cours...';
+                resultsContainer.style.display = 'block';
+                resultsLog.textContent = 'Lancement de la migration... Veuillez patienter.';
+
+                try {
+                    const api = new ApiService();
+                    const response = await api.request('/admin/recalculate-overdue-flags', {
+                        method: 'POST'
+                    });
+
+                    // Formater le log pour affichage
+                    let logOutput = `Statut: ${response.status}\n`;
+                    logOutput += `Message: ${response.message}\n`;
+                    logOutput += `Sauvegarde créée: ${response.backup_path}\n`;
+                    logOutput += `Actions mises à jour: ${response.updated_count}\n\n`;
+                    logOutput += '--- LOGS DÉTAILLÉS ---\n';
+                    logOutput += response.logs.join('\n');
+
+                    resultsLog.textContent = logOutput;
+                    resultsLog.classList.remove('bg-dark', 'bg-danger');
+                    resultsLog.classList.add('bg-success');
+
+                } catch (error) {
+                    resultsLog.textContent = `ERREUR: ${error.message}\n\n${error.stack || ''}`;
+                    resultsLog.classList.remove('bg-dark', 'bg-success');
+                    resultsLog.classList.add('bg-danger');
+
+                } finally {
+                    runBtn.disabled = false;
+                    runBtn.innerHTML = '<i class="bi bi-play-circle"></i> Lancer la migration';
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
