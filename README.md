@@ -17,7 +17,7 @@ GMAO est une application web complète conçue pour la gestion et le suivi des a
 
 ## 🚀 Installation et Lancement
 
-L'application est conçue pour un déploiement rapide et simple sur un PC Windows. Pour installer et lancer l'application, suivez les instructions détaillées dans notre guide de déploiement.
+L'application est conçue pour un déploiement rapide et simple sur un PC Debian. Pour installer et lancer l'application, suivez les instructions détaillées dans notre guide de déploiement.
 
 **➡️ [Consulter le Guide de Déploiement](DEPLOYMENT_GUIDE.md)**
 
