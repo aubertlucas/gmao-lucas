@@ -7,6 +7,7 @@ class ActionForm {
         this.authManager = new AuthManager();
         this.apiService = new ApiService();
         this.currentAction = null;
+        this.currentActionData = null; // Pour stocker les données de l'action chargée
         this.modal = null;
         this.calendarManager = window.calendarManager || new CalendarManager();
         this.locations = []; // Liste des lieux disponibles
@@ -18,6 +19,7 @@ class ActionForm {
      * @param {number|null} actionId - Action ID to edit, or null for new action
      */
     show(actionId = null) {
+        this.currentActionData = null; // Réinitialiser les données
         this.durationWarningShown = false; // Reset warning state each time the modal is shown
         // Vérification du rôle utilisateur - bloquer les pilotes pour la création d'actions
         const user = this.authManager.getUser();
@@ -388,9 +390,9 @@ class ActionForm {
                 select.innerHTML += `<option value="${user.id}">${user.username}</option>`;
             });
             
-            // Sélectionner la valeur actuelle si elle existe
-            if (this.currentAction && this.currentAction.assigned_to) {
-                select.value = this.currentAction.assigned_to;
+            // Sélectionner la valeur actuelle si les données de l'action sont disponibles
+            if (this.currentActionData && this.currentActionData.assigned_to) {
+                select.value = this.currentActionData.assigned_to;
             }
         } catch (error) {
             console.error('Erreur lors du chargement des utilisateurs assignables:', error);
@@ -405,6 +407,7 @@ class ActionForm {
     async loadAction(actionId) {
         try {
             const action = await this.apiService.getAction(actionId);
+            this.currentActionData = action; // Stocker les données de l'action
             const form = document.getElementById('actionForm');
             
             // Remplissage direct du formulaire en se basant sur les attributs 'name'
@@ -414,7 +417,7 @@ class ActionForm {
                     if (input.type === 'date' && action[key]) {
                         input.value = action[key].split('T')[0];
                     } else if (key === 'location_id' && action.location) {
-                        input.value = action.location.name; // Gérer le cas de l'objet lieu
+                        input.value = action.location.id; // Correction: utiliser l'ID et non le nom
                     } else if (key === 'assigned_to' && action.assigned_user) {
                         input.value = action.assigned_user.id; // Gérer le cas de l'objet utilisateur
                         }
@@ -429,6 +432,10 @@ class ActionForm {
             
             // Appliquer les restrictions basées sur le rôle utilisateur
             this.applyRoleBasedRestrictions();
+            
+            // S'assurer que l'utilisateur assigné est correctement sélectionné
+            // même en cas de race condition.
+            this.populateAssignableUsers();
             
         } catch (error) {
             console.error('Error loading action:', error);
@@ -943,3 +950,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 });
+
