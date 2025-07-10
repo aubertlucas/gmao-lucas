@@ -70,18 +70,48 @@ async def upload_photo(
             detail=f"Action with ID {action_id} not found"
         )
     
-    # Check file type
+    # Validate file type
     content_type = file.content_type
-    if not content_type.startswith("image/"):
+    if not content_type or not content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only image files are allowed"
         )
     
-    # Generate unique filename
-    extension = os.path.splitext(file.filename)[1] if "." in file.filename else ".jpg"
+    # Validate and sanitize filename
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No filename provided"
+        )
+    
+    # Extract and validate file extension 
+    original_filename = os.path.basename(file.filename)  # Remove any path components
+    extension = os.path.splitext(original_filename)[1].lower()
+    
+    # Validate file extension
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+    if extension not in allowed_extensions:
+        extension = '.jpg'  # Default to .jpg for safety
+    
+    # Generate secure unique filename with only safe characters
     unique_filename = f"{action_id}_{uuid4().hex}{extension}"
-    file_path = os.path.join(UPLOADS_DIR, unique_filename)
+    
+    # Create secure file path within photos subdirectory
+    photos_dir = os.path.join(UPLOADS_DIR, "photos", str(action_id))
+    os.makedirs(photos_dir, exist_ok=True)
+    
+    file_path = os.path.join(photos_dir, unique_filename)
+    
+    # Security check: Ensure the final path is within the expected directory
+    safe_photos_dir = os.path.realpath(photos_dir)
+    safe_file_path = os.path.realpath(file_path)
+    
+    if not safe_file_path.startswith(safe_photos_dir):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path"
+        )
     
     # Save file
     with open(file_path, "wb") as buffer:
@@ -90,11 +120,12 @@ async def upload_photo(
     # Get file size
     file_size = os.path.getsize(file_path)
     
-    # Create photo record
+    # Create photo record with secure relative path
+    relative_file_path = os.path.join("uploads", "photos", str(action_id), unique_filename)
     photo_data = {
         "action_id": action_id,
-        "filename": file.filename,
-        "file_path": os.path.join("uploads", "photos", unique_filename),
+        "filename": original_filename,  # Store original filename (sanitized)
+        "file_path": relative_file_path,
         "file_size": file_size,
         "mime_type": content_type,
         "uploaded_by": current_user.id
