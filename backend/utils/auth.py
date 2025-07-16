@@ -19,7 +19,21 @@ from models import User
 load_dotenv()
 
 # Configure JWT
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-for-jwt-please-change-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    import secrets
+    import warnings
+    # Generate a cryptographically secure random key for development
+    SECRET_KEY = secrets.token_urlsafe(32)
+    warnings.warn(
+        "No SECRET_KEY environment variable set. Using a randomly generated key. "
+        "This will invalidate all existing tokens on application restart. "
+        "Set SECRET_KEY environment variable for production use.",
+        UserWarning
+    )
+
+# Ensure SECRET_KEY is always a string (type safety)
+assert SECRET_KEY is not None, "SECRET_KEY must be set"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 

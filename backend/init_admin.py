@@ -27,11 +27,27 @@ if os.path.exists(root_db_path):
     except Exception as e:
         print(f"Impossible de supprimer l'ancienne base de données: {e}")
 
-# Données de l'utilisateur admin
-admin_username = "Lucas"
-admin_email = "aubertlu@decayeuxsti.fr"
-admin_password = "oscar324"
+def generate_secure_password(length=12):
+    """Generate a secure random password"""
+    import secrets
+    import string
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    password = ''.join(secrets.choice(alphabet) for _ in range(length))
+    return password
+
+# Données de l'utilisateur admin - utiliser les variables d'environnement ou des valeurs par défaut sécurisées
+admin_username = os.getenv("ADMIN_USERNAME", "admin")
+admin_email = os.getenv("ADMIN_EMAIL", "admin@company.com")
+admin_password = os.getenv("ADMIN_PASSWORD")  # Must be set in environment
 admin_role = "admin"
+
+# Si aucun mot de passe n'est fourni dans l'environnement, générer un mot de passe sécurisé
+if not admin_password:
+    admin_password = generate_secure_password(16)
+    print(f"ATTENTION: Aucun mot de passe admin configuré dans l'environnement.")
+    print(f"Un mot de passe sécurisé a été généré automatiquement.")
+    print(f"VEUILLEZ NOTER CE MOT DE PASSE: {admin_password}")
+    print(f"Configurez la variable d'environnement ADMIN_PASSWORD pour un usage en production.")
 
 # Ouvrir une session
 db = SessionLocal()
@@ -67,8 +83,10 @@ try:
         
         print(f"Utilisateur administrateur créé avec succès!")
         print(f"Username: {admin_username}")
-        print(f"Password: {admin_password}")
+        print(f"Email: {admin_email}")
         print(f"Role: {admin_role}")
+        if not os.getenv("ADMIN_PASSWORD"):
+            print(f"Password: {admin_password} (À CHANGER IMMÉDIATEMENT)")
 except Exception as e:
     print(f"Erreur lors de la création de l'administrateur: {e}")
 finally:
