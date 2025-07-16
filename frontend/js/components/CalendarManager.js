@@ -228,7 +228,7 @@ class CalendarManager {
                                                 <th>Date</th>
                                                 <th>Type</th>
                                                 <th>Description</th>
-                                                <th class="text-center">Heures</th>
+                                                <th class="text-center">Absence</th>
                                                 <th class="text-center">Actions</th>
                                             </tr>
                                         </thead>
@@ -390,11 +390,16 @@ class CalendarManager {
                     childRow.style.display = 'table-row'; // Afficher si c'est une exception seule
                 }
                 
+                // Calculer les heures d'absence pour l'affichage
+                const normalHours = this.getUserNormalHoursForDate(this.currentUserId, exception.exception_date);
+                const absenceHours = Math.max(0, normalHours - exception.working_hours);
+                const absenceDisplay = absenceHours === normalHours ? `${absenceHours}h (complet)` : `${absenceHours}h`;
+                
                 childRow.innerHTML = `
                     <td class="${isGroup ? 'ps-4' : ''}">${this.formatDateFr(exception.exception_date)}</td>
                     <td><span class="badge" style="background-color: ${typeInfo.color}; font-size: 0.8em; padding: 0.4em 0.6em;">${typeInfo.label}</span></td>
                     <td>${exception.description || '-'}</td>
-                    <td class="text-center">${exception.working_hours} h</td>
+                    <td class="text-center">${absenceDisplay}</td>
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-primary edit-exception" data-id="${exception.id}" title="Modifier"><i class="bi bi-pencil"></i></button>
                         <button class="btn btn-sm btn-outline-danger delete-exception" data-id="${exception.id}" title="Supprimer"><i class="bi bi-trash"></i></button>
@@ -716,11 +721,14 @@ class CalendarManager {
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="exceptionHours" class="form-label">Heures travaillées</label>
+                                    <label for="exceptionHours" class="form-label">Heures d'absence</label>
                                     <input type="number" class="form-control" id="exceptionHours" 
                                            min="0" max="24" step="0.5" value="0">
                                     <div class="form-text text-muted">
-                                        Pour les jours partiellement travaillés (0 = jour non travaillé)
+                                        Nombre d'heures d'absence ce jour-là (0 = aucune absence, journée normale)
+                                    </div>
+                                    <div id="hoursInfo" class="form-text text-info" style="display: none;">
+                                        <i class="bi bi-info-circle"></i> <span id="hoursInfoText"></span>
                                     </div>
                                 </div>
                             </form>
@@ -830,9 +838,16 @@ class CalendarManager {
                 document.getElementById('exceptionId').value = exception.id;
                 document.getElementById('exceptionDateStart').value = exception.exception_date;
                 document.getElementById('exceptionDateEnd').parentElement.style.display = 'none';
-                document.getElementById('exceptionType').value = exception.exception_type;
                 document.getElementById('exceptionDescription').value = exception.description || '';
-                document.getElementById('exceptionHours').value = exception.working_hours || 0;
+                
+                // Le type d'exception sera défini après la configuration des event listeners
+                
+                // Convertir working_hours en heures d'absence pour l'affichage
+                const normalHours = this.getUserNormalHoursForDate(this.currentUserId, exception.exception_date);
+                const absenceHours = Math.max(0, normalHours - exception.working_hours);
+                document.getElementById('exceptionHours').value = absenceHours;
+                
+                console.log(`[EDIT] Exception ${exception.id}: ${normalHours}h normales - ${exception.working_hours}h travaillées = ${absenceHours}h d'absence`);
             }
         } else {
             // Définir la date de début par défaut à aujourd'hui
@@ -875,7 +890,25 @@ class CalendarManager {
             console.log('[MODAL] Event listener de fermeture terminé');
         }, { once: true });
         
-        // ÉTAPE 7: Afficher le modal
+        // ÉTAPE 7: Appliquer les données d'exception après configuration (si édition)
+        if (exceptionId) {
+            const exception = this.exceptions.find(e => e.id == exceptionId);
+            if (exception) {
+                setTimeout(() => {
+                    const typeSelect = document.getElementById('exceptionType');
+                    if (typeSelect) {
+                        typeSelect.value = exception.exception_type;
+                        console.log(`[EDIT] Type d'exception appliqué après configuration: ${typeSelect.value}`);
+                        
+                        // Déclencher la mise à jour des informations d'heures
+                        const updateEvent = new Event('change', { bubbles: true });
+                        document.getElementById('exceptionDateStart').dispatchEvent(updateEvent);
+                    }
+                }, 100);
+            }
+        }
+        
+        // ÉTAPE 8: Afficher le modal
         console.log('[MODAL] Affichage du modal');
         this.modalInstance.show();
     }
@@ -944,6 +977,60 @@ class CalendarManager {
         
         // Event listener unique pour la date de fin
         cleanEndDate.addEventListener('change', updateDateRangeSummary, { once: false });
+        
+        // Fonction pour mettre à jour les informations sur les heures
+        const updateHoursInfo = () => {
+            const startDate = cleanStartDate.value;
+            const hoursInput = document.getElementById('exceptionHours');
+            const hoursInfo = document.getElementById('hoursInfo');
+            const hoursInfoText = document.getElementById('hoursInfoText');
+            
+            if (startDate && hoursInput && hoursInfo && hoursInfoText) {
+                const normalHours = this.getUserNormalHoursForDate(this.currentUserId, startDate);
+                let absenceHours = parseFloat(hoursInput.value) || 0;
+                
+                // Validation: limiter les heures d'absence aux heures normales
+                if (absenceHours > normalHours) {
+                    absenceHours = normalHours;
+                    hoursInput.value = normalHours;
+                }
+                
+                const workingHours = Math.max(0, normalHours - absenceHours);
+                
+                // Mettre à jour le maximum pour les heures d'absence
+                hoursInput.max = normalHours;
+                
+                // Changer la couleur selon la situation
+                hoursInput.classList.remove('is-invalid', 'is-valid');
+                if (absenceHours > normalHours) {
+                    hoursInput.classList.add('is-invalid');
+                } else if (absenceHours > 0) {
+                    hoursInput.classList.add('is-valid');
+                }
+                
+                if (normalHours > 0) {
+                    hoursInfo.style.display = 'block';
+                    if (absenceHours === normalHours) {
+                        hoursInfoText.textContent = `Heures normales: ${normalHours}h → Absence complète (0h travaillées)`;
+                        hoursInfoText.className = 'form-text text-warning';
+                    } else if (absenceHours > 0) {
+                        hoursInfoText.textContent = `Heures normales: ${normalHours}h → Heures travaillées après absence: ${workingHours}h`;
+                        hoursInfoText.className = 'form-text text-info';
+                    } else {
+                        hoursInfoText.textContent = `Heures normales: ${normalHours}h → Aucune absence (journée normale)`;
+                        hoursInfoText.className = 'form-text text-success';
+                    }
+                } else {
+                    hoursInfo.style.display = 'block';
+                    hoursInfoText.textContent = `Ce jour n'est normalement pas travaillé (${normalHours}h)`;
+                    hoursInfoText.className = 'form-text text-muted';
+                }
+            }
+        };
+        
+        // Event listeners pour les changements de date et heures
+        cleanStartDate.addEventListener('change', updateHoursInfo, { once: false });
+        document.getElementById('exceptionHours').addEventListener('input', updateHoursInfo, { once: false });
         
         // EMPÊCHER ABSOLUMENT LA SOUMISSION DU FORMULAIRE
         cleanForm.addEventListener('submit', (e) => {
@@ -1063,6 +1150,8 @@ class CalendarManager {
         // Initialiser les min/max des datepickers
         if (cleanStartDate.value) {
             cleanEndDate.min = cleanStartDate.value;
+            // Déclencher la mise à jour des informations d'heures après initialisation
+            setTimeout(() => updateHoursInfo(), 100);
         }
         
         console.log('[MODAL] Tous les event listeners du modal configurés PROPREMENT');
@@ -1113,13 +1202,22 @@ class CalendarManager {
         }
         
         // Niveau 2: Protection légère par signature de données
+        const startDate = document.getElementById('exceptionDateStart').value;
+        const absenceHours = parseFloat(document.getElementById('exceptionHours').value) || 0;
+        
+        // Convertir les heures d'absence en heures travaillées
+        const normalHours = this.getUserNormalHoursForDate(this.currentUserId, startDate);
+        const workingHours = Math.max(0, normalHours - absenceHours);
+        
+        console.log(`[CONVERSION] Heures normales: ${normalHours}h, Absence: ${absenceHours}h → Travaillées: ${workingHours}h`);
+        
         const formData = {
             user_id: this.currentUserId,
-            start_date: document.getElementById('exceptionDateStart').value,
+            start_date: startDate,
             end_date: document.getElementById('exceptionDateEnd').value || null,
             type: document.getElementById('exceptionType').value,
             description: document.getElementById('exceptionDescription').value,
-            hours: parseFloat(document.getElementById('exceptionHours').value) || 0
+            hours: workingHours // Heures travaillées après conversion
         };
         
         const requestSignature = JSON.stringify(formData);
@@ -1665,6 +1763,29 @@ class CalendarManager {
         console.log(`[CalendarManager ${this.instanceId}] Destruction terminée`);
     }
 
+    /**
+     * Récupère les heures normales de travail pour un utilisateur un jour donné
+     * @param {number} userId - ID de l'utilisateur
+     * @param {string} date - Date au format YYYY-MM-DD
+     * @returns {number} - Nombre d'heures normales pour ce jour
+     */
+    getUserNormalHoursForDate(userId, date) {
+        if (!date) return 8; // Par défaut 8h
+        
+        // Convertir la date en jour de la semaine (0=Lundi, 6=Dimanche)
+        const dateObj = new Date(date);
+        const dayOfWeek = (dateObj.getDay() + 6) % 7;
+        
+        // Chercher dans l'horaire de l'utilisateur
+        const daySchedule = this.schedule.find(s => s.day_of_week === dayOfWeek);
+        
+        if (daySchedule && daySchedule.is_working_day) {
+            return daySchedule.working_hours || 8;
+        }
+        
+        // Si pas d'horaire défini, utiliser les valeurs par défaut
+        return dayOfWeek < 5 ? 8 : 0; // 8h lun-ven, 0h weekend
+    }
 
 }
 
