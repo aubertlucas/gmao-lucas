@@ -166,13 +166,13 @@ class PhotoManager {
         const html = this.photos.map(photo => `
             <div class="col-md-3 mb-3">
                 <div class="card h-100">
-                    <div class="position-relative photo-container">
+                    <div class="position-relative photo-card">
                         <img src="${photo.thumbnail_url || `http://frsasrvgmao:8000/uploads/thumbs/${this.currentActionId}/${photo.filename}`}?t=${Date.now()}" 
                              class="card-img-top" style="height: 150px; object-fit: cover;"
-                             onclick="photoManager.showFullSize(${photo.id})">
+                             onclick="window.photoManager.showFullSize(${photo.id})">
                         <div class="photo-overlay">
                             <button class="btn btn-sm btn-light rounded-circle"
-                                    onclick="photoManager.showFullSize(${photo.id})"
+                                    onclick="window.photoManager.showFullSize(${photo.id})"
                                     title="Voir en grand">
                                 <i class="bi bi-fullscreen"></i>
                             </button>
@@ -186,7 +186,7 @@ class PhotoManager {
                             ${this.formatFileSize(photo.file_size)}
                         </small>
                         <button class="btn btn-sm btn-outline-danger float-end" 
-                                onclick="photoManager.deletePhoto(${photo.id})">
+                                onclick="window.photoManager.deletePhoto(${photo.id})">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>

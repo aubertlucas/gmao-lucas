@@ -127,6 +127,14 @@ class AuthManager {
     }
     
     /**
+     * Get the current authentication token
+     * @returns {string|null} - Token or null if not authenticated
+     */
+    getToken() {
+        return this.token;
+    }
+    
+    /**
      * Get the current authenticated user
      * @returns {Object|null} - User object or null if not authenticated
      */
@@ -218,6 +226,23 @@ class AuthManager {
 
 // Initialize authentication manager
 const authManager = new AuthManager();
+
+// Global utility functions for backward compatibility
+function getToken() {
+    return authManager.getToken();
+}
+
+function getCurrentUser() {
+    return authManager.getUser();
+}
+
+function logout() {
+    authManager.logout();
+}
+
+function isAuthenticated() {
+    return authManager.isAuthenticated();
+}
 
 // Check authentication on restricted pages
 document.addEventListener('DOMContentLoaded', () => {

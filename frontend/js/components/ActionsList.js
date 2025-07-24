@@ -627,7 +627,7 @@ class ActionsList {
                     // Date comparison
                     result = new Date(aValue) - new Date(bValue);
                 } else {
-                    // String comparison
+                // String comparison
                     result = String(aValue).localeCompare(String(bValue), 'fr', { sensitivity: 'base' });
                 }
 
@@ -2451,6 +2451,102 @@ class ActionsList {
             // All other keys should now match the action properties directly
             default:
                 return action[key];
+        }
+    }
+    
+    /**
+     * Crée une nouvelle action avec des données pré-remplies depuis le planning
+     * @param {Object} planningData - Données du planning pour pré-remplir le formulaire
+     */
+    createActionFromPlanning(planningData) {
+        console.log('[ActionsList] Création d\'action depuis le planning:', planningData);
+        
+        // Vérifier les permissions
+        const user = this.authManager.getUser();
+        if (!user || user.role === 'pilot' || user.role === 'observer') {
+            showToast('Vous n\'êtes pas autorisé à créer des actions', 'error');
+            return;
+        }
+        
+        // Ouvrir le formulaire de création (actionId = null)
+        if (window.actionForm) {
+            window.actionForm.show(null);
+            
+            // Attendre que le formulaire soit ouvert puis pré-remplir les champs
+            setTimeout(() => {
+                this.prefillFormFromPlanning(planningData);
+            }, 500);
+        } else {
+            console.error('[ActionsList] ActionForm non disponible');
+            showToast('Erreur: formulaire d\'action non disponible', 'error');
+        }
+    }
+    
+    /**
+     * Pré-remplit le formulaire d'action avec les données du planning
+     * @param {Object} planningData - Données du planning
+     */
+    prefillFormFromPlanning(planningData) {
+        console.log('[ActionsList] Pré-remplissage du formulaire:', planningData);
+        
+        try {
+            // 1. Utilisateur assigné
+            if (planningData.assigned_to) {
+                const assignedUserField = document.getElementById('assigned_user');
+                if (assignedUserField) {
+                    assignedUserField.value = planningData.assigned_to;
+                    // Déclencher l'événement change pour mettre à jour l'interface
+                    assignedUserField.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            // 2. Date planifiée
+            if (planningData.planned_date) {
+                const plannedDateField = document.getElementById('planned_date');
+                if (plannedDateField) {
+                    plannedDateField.value = planningData.planned_date;
+                    plannedDateField.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            // 3. Durée estimée
+            if (planningData.estimated_duration) {
+                const durationField = document.getElementById('estimated_duration');
+                if (durationField) {
+                    durationField.value = planningData.estimated_duration;
+                    durationField.dispatchEvent(new Event('input'));
+                }
+            }
+            
+            // 4. Priorité
+            if (planningData.priority) {
+                const priorityField = document.getElementById('priority');
+                if (priorityField) {
+                    priorityField.value = planningData.priority;
+                    priorityField.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            // 5. Commentaire contextuel dans le champ description ou commentaires
+            if (planningData.context_comment) {
+                // Essayer d'abord le champ commentaires
+                let commentField = document.getElementById('comments');
+                if (!commentField) {
+                    // Sinon essayer description
+                    commentField = document.getElementById('description');
+                }
+                if (commentField) {
+                    commentField.value = planningData.context_comment;
+                    commentField.dispatchEvent(new Event('input'));
+                }
+            }
+            
+            // 6. Toast de confirmation
+            showToast(`Action pré-remplie avec les données du planning pour le ${planningData.planned_date}`, 'success');
+            
+        } catch (error) {
+            console.error('[ActionsList] Erreur lors du pré-remplissage:', error);
+            showToast('Données du planning appliquées (certains champs peuvent nécessiter une vérification)', 'warning');
         }
     }
 }

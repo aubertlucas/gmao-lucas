@@ -328,19 +328,50 @@ class CalendarManager {
             let j = i + 1;
             while (j < sortedExceptions.length) {
                 const next = sortedExceptions[j];
-                const expectedNextDate = new Date(group.endDate);
-                expectedNextDate.setDate(expectedNextDate.getDate() + 1);
-
-                // Vérifier si le jour suivant est consécutif et a les mêmes propriétés
-                if (next.exception_date === expectedNextDate.toISOString().split('T')[0] &&
-                    next.exception_type === group.type &&
-                    next.description === group.description) {
-                    group.endDate = next.exception_date;
-                    group.children.push(next);
-                    j++;
-                } else {
-                    break;
+                
+                // NOUVEAU : Vérification intelligente qui ignore les weekends
+                // On vérifie si c'est le même type et description
+                if (next.exception_type === group.type && next.description === group.description) {
+                    
+                    // Calculer la différence en jours entre la fin du groupe et la prochaine exception
+                    const groupEndDate = new Date(group.endDate);
+                    const nextDate = new Date(next.exception_date);
+                    const diffInDays = Math.floor((nextDate - groupEndDate) / (1000 * 60 * 60 * 24));
+                    
+                    // Si l'écart est raisonnable (≤ 7 jours, ce qui permet de couvrir un weekend + quelques jours)
+                    // ET qu'il n'y a pas d'autres exceptions d'un type différent entre les deux
+                    if (diffInDays <= 7) {
+                        // Vérifier qu'il n'y a pas d'exceptions d'un autre type entre group.endDate et next.exception_date
+                        let hasConflictingExceptionBetween = false;
+                        const tempDate = new Date(group.endDate);
+                        tempDate.setDate(tempDate.getDate() + 1);
+                        
+                        while (tempDate < nextDate) {
+                            const tempDateStr = tempDate.toISOString().split('T')[0];
+                            const conflictingException = sortedExceptions.find(ex => 
+                                ex.exception_date === tempDateStr && 
+                                (ex.exception_type !== group.type || ex.description !== group.description)
+                            );
+                            
+                            if (conflictingException) {
+                                hasConflictingExceptionBetween = true;
+                                break;
+                            }
+                            tempDate.setDate(tempDate.getDate() + 1);
+                        }
+                        
+                        // Si pas d'exception conflictuelle entre les deux, on peut grouper
+                        if (!hasConflictingExceptionBetween) {
+                            group.endDate = next.exception_date;
+                            group.children.push(next);
+                            j++;
+                            continue;
+                        }
+                    }
                 }
+                
+                // Si on arrive ici, on ne peut pas grouper cette exception
+                break;
             }
 
             groupedExceptions.push(group);
@@ -357,24 +388,79 @@ class CalendarManager {
 
             if (isGroup) {
                 const groupExceptionIds = group.children.map(child => child.id).join(',');
-                // Ligne de groupe
+                
+                // Calculer la durée totale d'absence du groupe
+                const totalAbsenceHours = group.children.reduce((total, exception) => {
+                    const normalHours = this.getUserNormalHoursForDate(this.currentUserId, exception.exception_date);
+                    const absenceHours = Math.max(0, normalHours - exception.working_hours);
+                    return total + absenceHours;
+                }, 0);
+                
+                // Icône selon le type
+                const typeIcon = {
+                    'vacation': 'bi-sun',
+                    'sick': 'bi-heart-pulse',
+                    'holiday': 'bi-calendar-event',
+                    'training': 'bi-mortarboard',
+                    'other': 'bi-question-circle'
+                }[group.type] || 'bi-question-circle';
+                
+                // Calculer la durée totale de la période en jours calendaires
+                const startDate = new Date(group.startDate);
+                const endDate = new Date(group.endDate);
+                const totalCalendarDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                const workingDays = group.children.length;
+                
+                // Créer un titre plus informatif
+                let periodTitle;
+                if (totalCalendarDays === workingDays) {
+                    // Période continue sans weekend
+                    periodTitle = `${this.formatDateFr(group.startDate)} - ${this.formatDateFr(group.endDate)}`;
+                } else {
+                    // Période avec weekends exclus
+                    const weeksCount = Math.ceil(totalCalendarDays / 7);
+                    periodTitle = `${this.formatDateFr(group.startDate)} - ${this.formatDateFr(group.endDate)}`;
+                }
+                
+                // Informations détaillées
+                let dayInfo;
+                if (totalCalendarDays === workingDays) {
+                    dayInfo = `${workingDays} jour${workingDays > 1 ? 's' : ''}`;
+                } else {
+                    dayInfo = `${workingDays} jour${workingDays > 1 ? 's' : ''} travaillé${workingDays > 1 ? 's' : ''} (sur ${totalCalendarDays} jours)`;
+                }
+                
+                // Ligne de groupe améliorée
                 const groupRow = document.createElement('tr');
-                groupRow.className = 'exception-group-row';
+                groupRow.className = 'exception-group-row table-light border-start border-4';
+                groupRow.style.borderLeftColor = typeInfo.color;
                 groupRow.dataset.groupId = groupId;
                 groupRow.innerHTML = `
-                    <td>
-                        <i class="bi bi-chevron-right toggle-icon me-2"></i>
-                        ${this.formatDateFr(group.startDate)} - ${this.formatDateFr(group.endDate)} (${group.children.length} jours)
+                    <td class="fw-semibold">
+                        <i class="bi bi-chevron-right toggle-icon me-2 text-muted" style="cursor: pointer; transition: transform 0.2s;"></i>
+                        <i class="${typeIcon} me-2" style="color: ${typeInfo.color};"></i>
+                        ${periodTitle}
+                        <small class="text-muted ms-2">(${dayInfo})</small>
                     </td>
-                    <td><span class="badge" style="background-color: ${typeInfo.color};">${typeInfo.label}</span></td>
-                    <td>${group.description || '-'}</td>
-                    <td class="text-center">-</td>
+                    <td>
+                        <span class="badge rounded-pill px-3 py-2" style="background-color: ${typeInfo.color}; font-size: 0.85em;">
+                            <i class="${typeIcon} me-1"></i>${typeInfo.label}
+                        </span>
+                    </td>
+                    <td class="text-muted fst-italic">${group.description || 'Aucune description'}</td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-danger delete-group-exception" 
-                                data-group-ids="${groupExceptionIds}" 
-                                title="Supprimer tout le groupe">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                        <span class="badge bg-secondary rounded-pill px-3 py-2">
+                            <i class="bi bi-clock me-1"></i>${totalAbsenceHours}h au total
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-danger delete-group-exception" 
+                                    data-group-ids="${groupExceptionIds}" 
+                                    title="Supprimer toute la période">
+                                <i class="bi bi-trash me-1"></i>Supprimer tout
+                            </button>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(groupRow);
@@ -386,6 +472,7 @@ class CalendarManager {
                 childRow.className = 'exception-child-row';
                 if (isGroup) {
                     childRow.dataset.parentGroupId = groupId;
+                    childRow.style.display = 'none'; // Caché par défaut pour les groupes
                 } else {
                     childRow.style.display = 'table-row'; // Afficher si c'est une exception seule
                 }
@@ -393,16 +480,73 @@ class CalendarManager {
                 // Calculer les heures d'absence pour l'affichage
                 const normalHours = this.getUserNormalHoursForDate(this.currentUserId, exception.exception_date);
                 const absenceHours = Math.max(0, normalHours - exception.working_hours);
-                const absenceDisplay = absenceHours === normalHours ? `${absenceHours}h (complet)` : `${absenceHours}h`;
+                
+                // Icône selon le type
+                const typeIcon = {
+                    'vacation': 'bi-sun',
+                    'sick': 'bi-heart-pulse',
+                    'holiday': 'bi-calendar-event',
+                    'training': 'bi-mortarboard',
+                    'other': 'bi-question-circle'
+                }[exception.exception_type] || 'bi-question-circle';
+                
+                // Affichage amélioré des heures d'absence
+                let absenceDisplay;
+                let absenceBadgeClass;
+                if (absenceHours === normalHours) {
+                    absenceDisplay = `${absenceHours}h (journée complète)`;
+                    absenceBadgeClass = 'bg-danger';
+                } else if (absenceHours > normalHours / 2) {
+                    absenceDisplay = `${absenceHours}h (sur ${normalHours}h)`;
+                    absenceBadgeClass = 'bg-warning text-dark';
+                } else if (absenceHours > 0) {
+                    absenceDisplay = `${absenceHours}h (sur ${normalHours}h)`;
+                    absenceBadgeClass = 'bg-info';
+                } else {
+                    absenceDisplay = 'Aucune absence';
+                    absenceBadgeClass = 'bg-success';
+                }
+                
+                // Formatage de la date avec le jour de la semaine
+                const dateObj = new Date(exception.exception_date);
+                const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                const dayName = dayNames[dateObj.getDay()];
+                const formattedDate = this.formatDateFr(exception.exception_date);
                 
                 childRow.innerHTML = `
-                    <td class="${isGroup ? 'ps-4' : ''}">${this.formatDateFr(exception.exception_date)}</td>
-                    <td><span class="badge" style="background-color: ${typeInfo.color}; font-size: 0.8em; padding: 0.4em 0.6em;">${typeInfo.label}</span></td>
-                    <td>${exception.description || '-'}</td>
-                    <td class="text-center">${absenceDisplay}</td>
+                    <td class="${isGroup ? 'ps-5' : ''}">
+                        <div class="d-flex align-items-center">
+                            <i class="${typeIcon} me-2" style="color: ${typeInfo.color};"></i>
+                            <div>
+                                <strong>${formattedDate}</strong>
+                                <br><small class="text-muted">${dayName}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge rounded-pill px-3 py-2" style="background-color: ${typeInfo.color}; font-size: 0.8em;">
+                            <i class="${typeIcon} me-1"></i>${typeInfo.label}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="text-wrap" style="max-width: 200px;">
+                            ${exception.description ? `<span class="text-dark">${exception.description}</span>` : '<span class="text-muted fst-italic">Aucune description</span>'}
+                        </div>
+                    </td>
                     <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary edit-exception" data-id="${exception.id}" title="Modifier"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-sm btn-outline-danger delete-exception" data-id="${exception.id}" title="Supprimer"><i class="bi bi-trash"></i></button>
+                        <span class="badge ${absenceBadgeClass} rounded-pill px-3 py-2">
+                            <i class="bi bi-clock me-1"></i>${absenceDisplay}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary edit-exception" data-id="${exception.id}" title="Modifier cette exception">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger delete-exception" data-id="${exception.id}" title="Supprimer cette exception">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(childRow);
@@ -559,11 +703,54 @@ class CalendarManager {
             }
             
             if (groupRow) {
+                e.preventDefault();
+                e.stopPropagation();
+                
                 const groupId = groupRow.dataset.groupId;
-                groupRow.classList.toggle('expanded');
-                document.querySelectorAll(`[data-parent-group-id="${groupId}"]`).forEach(childRow => {
-                    childRow.classList.toggle('expanded');
-                });
+                const toggleIcon = groupRow.querySelector('.toggle-icon');
+                const childRows = document.querySelectorAll(`[data-parent-group-id="${groupId}"]`);
+                
+                // Animation du chevron
+                const isExpanded = groupRow.classList.contains('expanded');
+                
+                if (isExpanded) {
+                    // Collapse : rotation et masquage
+                    toggleIcon.style.transform = 'rotate(0deg)';
+                    childRows.forEach((childRow, index) => {
+                        setTimeout(() => {
+                            childRow.style.transition = 'all 0.3s ease-out';
+                            childRow.style.opacity = '0';
+                            childRow.style.transform = 'translateY(-10px)';
+                            setTimeout(() => {
+                                childRow.style.display = 'none';
+                                childRow.style.transition = '';
+                                childRow.style.opacity = '';
+                                childRow.style.transform = '';
+                            }, 300);
+                        }, index * 50);
+                    });
+                    groupRow.classList.remove('expanded');
+                } else {
+                    // Expand : rotation et affichage
+                    toggleIcon.style.transform = 'rotate(90deg)';
+                    childRows.forEach((childRow, index) => {
+                        childRow.style.display = 'table-row';
+                        childRow.style.opacity = '0';
+                        childRow.style.transform = 'translateY(-10px)';
+                        
+                        setTimeout(() => {
+                            childRow.style.transition = 'all 0.3s ease-out';
+                            childRow.style.opacity = '1';
+                            childRow.style.transform = 'translateY(0)';
+                            setTimeout(() => {
+                                childRow.style.transition = '';
+                            }, 300);
+                        }, index * 50);
+                    });
+                    groupRow.classList.add('expanded');
+                }
+                
+                return;
             }
 
             if (editBtn) {
@@ -830,6 +1017,19 @@ class CalendarManager {
         document.getElementById('exceptionModalTitle').textContent = 'Ajouter une exception';
         document.getElementById('exceptionDateEnd').parentElement.style.display = 'block';
         
+        // NOUVEAU : Pré-remplir intelligemment les heures d'absence pour une nouvelle exception
+        if (!exceptionId) {
+            // Pour une nouvelle exception, mettre la date d'aujourd'hui par défaut
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('exceptionDateStart').value = today;
+            
+            // Calculer les heures normales pour aujourd'hui et pré-remplir une absence complète
+            const normalHours = this.getUserNormalHoursForDate(this.currentUserId, today);
+            document.getElementById('exceptionHours').value = normalHours;
+            
+            console.log(`[NOUVELLE EXCEPTION] Pré-remplissage: ${normalHours}h d'absence (journée complète) pour ${today}`);
+        }
+        
         // Si c'est une modification
         if (exceptionId) {
             const exception = this.exceptions.find(e => e.id == exceptionId);
@@ -954,9 +1154,14 @@ class CalendarManager {
                 const dates = this.generateDateRange(startDate, endDate);
                 summaryDiv.style.display = 'block';
                 if (dates.length === 1) {
-                    summaryText.textContent = `1 exception sera créée pour le ${this.formatDateFr(startDate)}.`;
+                    summaryText.textContent = `1 exception sera créée pour le ${this.formatDateFr(dates[0].date)} (jour travaillé).`;
+                } else if (dates.length === 0) {
+                    summaryText.textContent = `Aucune exception à créer - aucun jour travaillé dans cette période.`;
+                    summaryText.className = 'text-warning';
                 } else {
-                    summaryText.textContent = `${dates.length} exceptions seront créées pour la période du ${this.formatDateFr(startDate)} au ${this.formatDateFr(endDate)}.`;
+                    const totalDays = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1;
+                    summaryText.textContent = `${dates.length} exceptions seront créées pour ${dates.length} jours travaillés (sur ${totalDays} jours total) du ${this.formatDateFr(startDate)} au ${this.formatDateFr(endDate)}.`;
+                    summaryText.className = 'text-success';
                 }
             } else {
                 summaryDiv.style.display = 'none';
@@ -978,7 +1183,7 @@ class CalendarManager {
         // Event listener unique pour la date de fin
         cleanEndDate.addEventListener('change', updateDateRangeSummary, { once: false });
         
-        // Fonction pour mettre à jour les informations sur les heures
+        // Fonction pour mettre à jour les informations sur les heures (DÉCLARÉE EN PREMIER)
         const updateHoursInfo = () => {
             const startDate = cleanStartDate.value;
             const hoursInput = document.getElementById('exceptionHours');
@@ -1008,28 +1213,84 @@ class CalendarManager {
                     hoursInput.classList.add('is-valid');
                 }
                 
-                if (normalHours > 0) {
-                    hoursInfo.style.display = 'block';
-                    if (absenceHours === normalHours) {
-                        hoursInfoText.textContent = `Heures normales: ${normalHours}h → Absence complète (0h travaillées)`;
-                        hoursInfoText.className = 'form-text text-warning';
-                    } else if (absenceHours > 0) {
-                        hoursInfoText.textContent = `Heures normales: ${normalHours}h → Heures travaillées après absence: ${workingHours}h`;
-                        hoursInfoText.className = 'form-text text-info';
-                    } else {
-                        hoursInfoText.textContent = `Heures normales: ${normalHours}h → Aucune absence (journée normale)`;
-                        hoursInfoText.className = 'form-text text-success';
-                    }
+                // Afficher les informations sur les heures
+                hoursInfo.style.display = 'block';
+                if (absenceHours === normalHours) {
+                    hoursInfoText.textContent = `Absence complète (${absenceHours}h sur ${normalHours}h) = 0h travaillées`;
+                    hoursInfoText.className = 'form-text text-danger';
+                } else if (absenceHours > 0) {
+                    hoursInfoText.textContent = `${absenceHours}h d'absence sur ${normalHours}h = ${workingHours}h travaillées`;
+                    hoursInfoText.className = 'form-text text-info';
+                } else if (normalHours > 0) {
+                    hoursInfoText.textContent = `Journée normale de travail (${normalHours}h)`;
+                    hoursInfoText.className = 'form-text text-success';
                 } else {
-                    hoursInfo.style.display = 'block';
                     hoursInfoText.textContent = `Ce jour n'est normalement pas travaillé (${normalHours}h)`;
                     hoursInfoText.className = 'form-text text-muted';
                 }
             }
         };
         
-        // Event listeners pour les changements de date et heures
-        cleanStartDate.addEventListener('change', updateHoursInfo, { once: false });
+        // NOUVEAU : Event listener pour adapter les heures selon le type d'exception
+        const exceptionTypeSelect = document.getElementById('exceptionType');
+        const updateHoursByExceptionType = () => {
+            const startDate = cleanStartDate.value;
+            const selectedType = exceptionTypeSelect.value;
+            const hoursInput = document.getElementById('exceptionHours');
+            
+            if (startDate) {
+                const normalHours = this.getUserNormalHoursForDate(this.currentUserId, startDate);
+                
+                // Adapter les heures selon le type d'exception
+                let suggestedAbsenceHours = 0;
+                
+                switch (selectedType) {
+                    case 'vacation':    // Congés - absence complète
+                    case 'sick':        // Maladie - absence complète
+                    case 'holiday':     // Jour férié - absence complète
+                        suggestedAbsenceHours = normalHours;
+                        break;
+                    case 'training':    // Formation - peut être partielle, mais souvent complète
+                        suggestedAbsenceHours = normalHours;
+                        break;
+                    case 'other':       // Autre - laisser à l'utilisateur le choix
+                        suggestedAbsenceHours = Math.floor(normalHours / 2); // Demi-journée par défaut
+                        break;
+                    default:
+                        suggestedAbsenceHours = normalHours;
+                }
+                
+                hoursInput.value = suggestedAbsenceHours;
+                console.log(`[TYPE EXCEPTION] ${selectedType} → ${suggestedAbsenceHours}h d'absence suggérées (sur ${normalHours}h normales)`);
+                
+                // Mettre à jour l'info des heures
+                updateHoursInfo();
+            }
+        };
+        
+        exceptionTypeSelect.addEventListener('change', updateHoursByExceptionType, { once: false });
+        
+        // Déclencher l'adaptation initiale si on a déjà une date
+        if (cleanStartDate.value) {
+            updateHoursByExceptionType();
+        }
+        
+        // Aussi mettre à jour quand la date change
+        cleanStartDate.addEventListener('change', () => {
+            // Assurer que la date de fin n'est pas antérieure à la date de début
+            if (cleanEndDate.value && cleanEndDate.value < cleanStartDate.value) {
+                cleanEndDate.value = cleanStartDate.value;
+            }
+            cleanEndDate.min = cleanStartDate.value;
+            updateDateRangeSummary();
+            
+            // NOUVEAU : Mettre à jour les heures selon le type sélectionné
+            updateHoursByExceptionType();
+        }, { once: false });
+        
+        // (Fonction updateHoursInfo déplacée plus haut pour résoudre l'ordre de déclaration)
+        
+        // Event listener pour les changements d'heures seulement (la date est gérée plus haut)
         document.getElementById('exceptionHours').addEventListener('input', updateHoursInfo, { once: false });
         
         // EMPÊCHER ABSOLUMENT LA SOUMISSION DU FORMULAIRE
@@ -1304,14 +1565,38 @@ class CalendarManager {
                 // Compteur pour le nombre d'exceptions ajoutées avec succès
                 let successCount = 0;
                 
-                // Créer une exception pour chaque date SÉQUENTIELLEMENT pour éviter les conflits
-                for (const date of dates) {
+                // Créer une exception pour chaque jour travaillé SÉQUENTIELLEMENT pour éviter les conflits
+                for (const dayInfo of dates) {
+                    // Calculer les heures de travail selon le type d'exception et les heures normales de ce jour
+                    let absenceHoursForDay = 0;
+                    const normalHours = dayInfo.normalHours;
+                    
+                    // Adapter les heures selon le type d'exception (même logique que dans la modal)
+                    switch (exceptionType) {
+                        case 'vacation':    // Congés - absence complète
+                        case 'sick':        // Maladie - absence complète
+                        case 'holiday':     // Jour férié - absence complète
+                            absenceHoursForDay = normalHours;
+                            break;
+                        case 'training':    // Formation - absence complète par défaut
+                            absenceHoursForDay = normalHours;
+                            break;
+                        case 'other':       // Autre - demi-journée par défaut
+                            absenceHoursForDay = Math.floor(normalHours / 2);
+                            break;
+                        default:
+                            absenceHoursForDay = normalHours;
+                    }
+                    
+                    // Convertir les heures d'absence en heures travaillées
+                    const workingHoursForDay = Math.max(0, normalHours - absenceHoursForDay);
+                    
                     const exceptionData = {
                         user_id: this.currentUserId,
-                        exception_date: date,
+                        exception_date: dayInfo.date,
                         exception_type: exceptionType,
                         description: exceptionDescription,
-                        working_hours: exceptionHours
+                        working_hours: workingHoursForDay
                     };
                     
                     try {
@@ -1320,7 +1605,7 @@ class CalendarManager {
                             throw new Error('Verrou global perdu pendant l\'opération');
                         }
                         
-                        console.log(`[${requestId}] Envoi exception pour ${date}`);
+                        console.log(`[${requestId}] Envoi exception pour ${dayInfo.date}: ${normalHours}h normales - ${absenceHoursForDay}h absence = ${workingHoursForDay}h travaillées`);
                         
                         // Créer une nouvelle exception avec protection
                         const response = await this.apiService.request(
@@ -1331,7 +1616,7 @@ class CalendarManager {
                             }
                         );
                         
-                        console.log(`[${requestId}] Succès pour ${date}:`, response.id);
+                        console.log(`[${requestId}] Succès pour ${dayInfo.date}:`, response.id);
                         
                         // Ajouter la nouvelle exception au tableau local
                         this.exceptions.push(response);
@@ -1342,11 +1627,11 @@ class CalendarManager {
                             await new Promise(resolve => setTimeout(resolve, 200));
                         }
                     } catch (error) {
-                        console.error(`[${requestId}] Erreur pour ${date}:`, error.message);
+                        console.error(`[${requestId}] Erreur pour ${dayInfo.date}:`, error.message);
                         
                         // Si c'est une erreur de doublon, ne pas compter comme une erreur critique
                         if (error.message && error.message.includes('existe déjà')) {
-                            console.log(`[${requestId}] Exception déjà existante pour ${date} - ignorée`);
+                            console.log(`[${requestId}] Exception déjà existante pour ${dayInfo.date} - ignorée`);
                         }
                     }
                 }
@@ -1641,10 +1926,10 @@ class CalendarManager {
     }
 
     /**
-     * Génère une plage de dates entre deux dates (incluses)
-     * @param {string} startDate - Date de début au format YYYY-MM-DD
-     * @param {string} endDate - Date de fin au format YYYY-MM-DD
-     * @returns {Array<string>} - Tableau de dates au format YYYY-MM-DD
+     * Génère une plage de dates en excluant les jours non travaillés
+     * @param {string} startDate - Date de début (YYYY-MM-DD)
+     * @param {string} endDate - Date de fin (YYYY-MM-DD)
+     * @returns {Array} - Array des dates travaillées au format YYYY-MM-DD
      */
     generateDateRange(startDate, endDate) {
         const result = [];
@@ -1658,12 +1943,26 @@ class CalendarManager {
         
         // Tant qu'on n'a pas dépassé la date de fin
         while (current <= end) {
-            // Ajouter la date courante au format YYYY-MM-DD
-            result.push(current.toISOString().split('T')[0]);
+            const dateStr = current.toISOString().split('T')[0];
+            
+            // NOUVEAU : Vérifier si ce jour est effectivement travaillé
+            const normalHours = this.getUserNormalHoursForDate(this.currentUserId, dateStr);
+            
+            // Ne conserver que les jours où l'utilisateur travaille normalement
+            if (normalHours > 0) {
+                result.push({
+                    date: dateStr,
+                    normalHours: normalHours
+                });
+            } else {
+                console.log(`[DATE RANGE] ${dateStr} exclu (${normalHours}h - jour non travaillé)`);
+            }
             
             // Passer au jour suivant
             current.setDate(current.getDate() + 1);
         }
+        
+        console.log(`[DATE RANGE] Période ${startDate} → ${endDate}: ${result.length} jours travaillés sur ${Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1} jours total`);
         
         return result;
     }

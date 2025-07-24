@@ -121,7 +121,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#"><i class="bi bi-gear-fill me-2"></i>GMAO</a>
+            <a class="navbar-brand" href="#"><i class="bi bi-gear-fill me-2"></i>GMBAO</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -135,6 +135,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="actions.html">
                             <i class="bi bi-list-task"></i> Actions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="planning.html">
+                            <i class="bi bi-calendar-week"></i> Planning
                         </a>
                     </li>
                     <li class="nav-item" id="configMenuItem">
@@ -205,6 +210,12 @@
                     <button class="nav-link" id="system-tab" data-bs-toggle="tab"
                             data-bs-target="#system" type="button" role="tab">
                         <i class="bi bi-hdd-stack"></i> État du Système
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="settings-tab" data-bs-toggle="tab"
+                            data-bs-target="#settings" type="button" role="tab">
+                        <i class="bi bi-gear"></i> Réglages
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -364,6 +375,75 @@
                                 </div>
                                 <p class="mt-2">Chargement des informations de stockage...</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings Tab -->
+                <div class="tab-pane fade" id="settings" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-gear"></i> Réglages du Système</h5>
+                        </div>
+                        <div class="card-body">
+                            
+                            <!-- Tolérance de retard -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="bi bi-clock-history"></i> Vision avec tolérance des retards</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <h6><i class="bi bi-info-circle"></i> Fonctionnement :</h6>
+                                        <p class="mb-2">Cette option vous permet de voir <strong>toutes les statistiques</strong> avec une vision tolérante des retards.</p>
+                                        <ul class="mb-0 small">
+                                            <li><strong>Désactivé</strong> : Affichage standard des retards</li>
+                                            <li><strong>Activé</strong> : Vous voyez tous les graphiques avec tolérance appliquée (basée sur les heures de travail de chaque utilisateur)</li>
+                                            <li><strong>🔒 Personnel</strong> : Seul VOUS voyez cette vue modifiée, les autres utilisateurs gardent l'affichage normal</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="delayToleranceSwitch">
+                                                <label class="form-check-label" for="delayToleranceSwitch">
+                                                    <strong>Activer ma vision avec tolérance</strong>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                <strong>Réglage personnel</strong> : Modifie seulement VOTRE vue des graphiques et statistiques
+                                            </div>
+                                            <div id="toleranceStatus" class="mt-2">
+                                                <span class="badge bg-secondary">Chargement...</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 text-end">
+                                            <button id="applyToleranceBtn" class="btn btn-success" disabled>
+                                                <i class="bi bi-save"></i> Sauvegarder
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="toleranceResults" class="mt-3" style="display: none;">
+                                        <div class="alert alert-success">
+                                            <h6><i class="bi bi-check-circle"></i> Préférences sauvegardées</h6>
+                                            <div id="toleranceResultsContent"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Autres réglages futurs -->
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Autres réglages</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted">D'autres options de configuration seront ajoutées ici selon les besoins.</p>
+                                </div>
+                            </div>
+                            
                         </div>
                     </div>
                 </div>
@@ -937,7 +1017,107 @@
             
             // Ajouter un écouteur d'événement pour le bouton de réinitialisation
             document.getElementById('resetAppDataBtn').addEventListener('click', resetApplicationData);
+            
+            // Initialiser la gestion de la tolérance des retards (stockage local)
+            initDelayToleranceManagement();
         });
+
+        // Gestion de la tolérance des retards (stockage local)
+        async function initDelayToleranceManagement() {
+            const toleranceSwitch = document.getElementById('delayToleranceSwitch');
+            const applyBtn = document.getElementById('applyToleranceBtn');
+            const statusElement = document.getElementById('toleranceStatus');
+            const resultsElement = document.getElementById('toleranceResults');
+            const resultsContent = document.getElementById('toleranceResultsContent');
+            
+            // Charger le statut depuis le localStorage
+            loadToleranceStatus();
+            
+            // Événement pour le switch
+            toleranceSwitch.addEventListener('change', function() {
+                applyBtn.disabled = false;
+                updateStatusDisplay();
+            });
+            
+            // Événement pour le bouton appliquer
+            applyBtn.addEventListener('click', async function() {
+                await saveToleranceSettings();
+            });
+            
+            function loadToleranceStatus() {
+                try {
+                    // Charger depuis le localStorage (réglage personnel)
+                    const savedSetting = localStorage.getItem('gmao_delay_tolerance_enabled');
+                    toleranceSwitch.checked = savedSetting === 'true';
+                    updateStatusDisplay();
+                } catch (error) {
+                    console.error('Erreur lors du chargement du statut:', error);
+                    statusElement.innerHTML = '<span class="badge bg-danger">Erreur de chargement</span>';
+                }
+            }
+            
+            function updateStatusDisplay() {
+                if (toleranceSwitch.checked) {
+                    statusElement.innerHTML = '<span class="badge bg-success">Vision avec tolérance activée</span>';
+                } else {
+                    statusElement.innerHTML = '<span class="badge bg-secondary">Vision standard</span>';
+                }
+            }
+            
+            async function saveToleranceSettings() {
+                applyBtn.disabled = true;
+                applyBtn.innerHTML = '<i class="bi bi-save spinner-border spinner-border-sm"></i> Sauvegarde...';
+                resultsElement.style.display = 'none';
+                
+                try {
+                    // Sauvegarder dans le localStorage
+                    localStorage.setItem('gmao_delay_tolerance_enabled', toleranceSwitch.checked.toString());
+                    
+                    // Afficher le résultat
+                    resultsContent.innerHTML = `
+                        <p><strong>Préférences sauvegardées avec succès !</strong></p>
+                        <p>Votre vision avec tolérance est maintenant <strong>${toleranceSwitch.checked ? 'activée' : 'désactivée'}</strong>.</p>
+                        <p class="small text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            Seul vous verrez cette vue modifiée. Les autres utilisateurs gardent l'affichage standard.
+                        </p>
+                        <div class="mt-3">
+                            <button class="btn btn-primary btn-sm" onclick="refreshDashboardNow()">
+                                <i class="bi bi-arrow-clockwise"></i> Actualiser le dashboard maintenant
+                            </button>
+                            <p class="small text-muted mt-2">
+                                Ou rechargez manuellement la page du dashboard pour voir les changements.
+                            </p>
+                        </div>
+                    `;
+                    resultsElement.style.display = 'block';
+                    
+                    showToast('Préférences sauvegardées avec succès', 'success');
+                    updateStatusDisplay();
+                    
+                } catch (error) {
+                    console.error('Erreur lors de la sauvegarde:', error);
+                    showToast('Erreur lors de la sauvegarde des préférences', 'error');
+                } finally {
+                    applyBtn.disabled = false;
+                    applyBtn.innerHTML = '<i class="bi bi-save"></i> Sauvegarder';
+                }
+            }
+        }
+    </script>
+    
+    <script>
+        // Fonction pour rafraîchir le dashboard depuis l'admin
+        function refreshDashboardNow() {
+            if (typeof window.refreshDashboardWithTolerance === 'function') {
+                window.refreshDashboardWithTolerance();
+                showToast('Dashboard actualisé avec vos nouvelles préférences', 'success');
+            } else {
+                // Fallback: ouvrir le dashboard dans un nouvel onglet
+                window.open('dashboard.html', '_blank');
+                showToast('Dashboard ouvert dans un nouvel onglet', 'info');
+            }
+        }
     </script>
 </body>
 </html>

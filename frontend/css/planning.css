@@ -1,0 +1,783 @@
+/* Planning Styles */
+
+/* Animations pour l'apparition des jours */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* Planning Grid - Orientation Verticale */
+#planningGrid {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+}
+
+#planningGrid::-webkit-scrollbar {
+    height: 8px;
+}
+
+#planningGrid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#planningGrid::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+#planningGrid::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Planning Grid */
+.planning-day {
+    min-width: 280px; /* Largeur minimale pour chaque colonne jour */
+    flex-shrink: 0; /* Empêche la réduction */
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    height: fit-content;
+    background: linear-gradient(to bottom, #ffffff, #f8fafc);
+    box-shadow: 
+        0 4px 8px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.planning-day:hover {
+    border-color: #3b82f6;
+    transform: translateY(-4px);
+    box-shadow: 
+        0 8px 24px rgba(59, 130, 246, 0.15),
+        0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.planning-day-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 16px;
+    border-bottom: 2px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.planning-day-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.planning-day-date {
+    color: #e2e8f0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.planning-day-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+/* Amélioration des badges dans l'en-tête */
+.planning-day-info .action-count,
+.planning-day-info .day-status {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Exception indicator dans l'en-tête */
+.planning-day-info .exception-indicator {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #dc2626 !important;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-shadow: none;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Badge absence dans l'en-tête */
+.planning-day-info .day-status.absence {
+    background: rgba(220, 38, 38, 0.9) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.planning-day-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Progress Bars - Orientation Verticale Améliorée */
+.workload-bar {
+    width: 32px; /* Plus large pour meilleure lisibilité */
+    height: 220px; /* Plus haut */
+    background: linear-gradient(to bottom, #f8fafc, #e2e8f0); /* Dégradé subtil */
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid #cbd5e1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 0 auto;
+    box-shadow: 
+        0 4px 8px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.workload-bar:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 
+        0 8px 16px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-color: #64748b;
+}
+
+.workload-progress {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column-reverse; /* Les premiers éléments apparaissent en bas */
+    position: relative;
+}
+
+.workload-segment {
+    width: 100%;
+    transition: all 0.3s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    text-shadow: 
+        0 1px 2px rgba(0, 0, 0, 0.5),
+        0 0 4px rgba(0, 0, 0, 0.3);
+    writing-mode: vertical-rl; /* Texte vertical */
+    text-orientation: mixed;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Individual Action Segments */
+.workload-action {
+    position: relative;
+    transition: all 0.2s ease;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.workload-action:hover {
+    z-index: 10;
+    transform: scale(1.02);
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.action-segment-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 0.6rem;
+    line-height: 1.1;
+}
+
+.action-number {
+    font-weight: 700;
+    font-size: 0.65rem;
+    opacity: 0.9;
+}
+
+.action-hours {
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+/* Status Colors - Logique corrigée avec spécificité renforcée */
+.workload-segment.workload-completed {
+    background: linear-gradient(to top, #059669, #10b981, #34d399) !important;
+    box-shadow: inset 0 2px 4px rgba(5, 150, 105, 0.3);
+}
+
+.workload-segment.workload-in-progress {
+    background: linear-gradient(to top, #d97706, #f59e0b, #fbbf24) !important;
+    box-shadow: inset 0 2px 4px rgba(217, 119, 6, 0.3);
+}
+
+.workload-segment.workload-pending {
+    background: linear-gradient(to top, #d97706, #f59e0b, #fbbf24) !important;
+    box-shadow: inset 0 2px 4px rgba(217, 119, 6, 0.3);
+}
+
+.workload-segment.workload-absence {
+    background: repeating-linear-gradient(
+        45deg,
+        #dc2626,
+        #dc2626 4px,
+        #fca5a5 4px,
+        #fca5a5 8px
+    ) !important;
+    border: 1px solid #991b1b;
+}
+
+.workload-segment.workload-free {
+    background: linear-gradient(to top, #e2e8f0, #f1f5f9) !important;
+    border: 2px dashed #94a3b8;
+    color: #64748b;
+    text-shadow: none;
+}
+
+.workload-segment.workload-overload {
+    background: linear-gradient(to top, #dc2626, #ef4444, #f87171) !important;
+    box-shadow: 
+        inset 0 2px 4px rgba(220, 38, 38, 0.3),
+        0 0 8px rgba(239, 68, 68, 0.4);
+    position: relative;
+    animation: pulse 2s infinite;
+}
+
+/* Animation pour surcharge */
+@keyframes pulse {
+    0%, 100% { 
+        box-shadow: 
+            inset 0 2px 4px rgba(220, 38, 38, 0.3),
+            0 0 8px rgba(239, 68, 68, 0.4);
+    }
+    50% { 
+        box-shadow: 
+            inset 0 2px 4px rgba(220, 38, 38, 0.5),
+            0 0 16px rgba(239, 68, 68, 0.6);
+    }
+}
+
+.workload-overload::after {
+    content: '⚠️';
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.9rem;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Day Status Indicators */
+.day-status {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.day-status.normal {
+    background: #dbeafe;
+    color: #3730a3;
+}
+
+.day-status.busy {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.day-status.overloaded {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.day-status.free {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.day-status.off {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* Workload Labels */
+.workload-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1f2937;
+    pointer-events: none;
+    z-index: 10;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.workload-hours {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    text-align: center;
+    writing-mode: horizontal-tb; /* Garde le texte horizontal pour les heures */
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    min-width: 80px;
+}
+
+/* Responsive pour orientation verticale améliorée */
+@media (max-width: 768px) {
+    #planningGrid {
+        gap: 0.5rem;
+    }
+    
+    .planning-day {
+        min-width: 180px;
+    }
+    
+    .workload-bar {
+        height: 180px;
+        width: 28px;
+    }
+    
+    .workload-hours {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        min-width: 70px;
+    }
+}
+
+@media (min-width: 1200px) {
+    .planning-day {
+        min-width: 350px;
+    }
+    
+    .workload-bar {
+        height: 280px;
+        width: 36px;
+    }
+    
+    .workload-hours {
+        font-size: 0.9rem;
+        padding: 8px 16px;
+        min-width: 90px;
+    }
+}
+
+/* Amélioration pour très grands écrans */
+@media (min-width: 1600px) {
+    .planning-day {
+        min-width: 400px;
+    }
+    
+    .workload-bar {
+        height: 320px;
+        width: 40px;
+    }
+}
+
+/* Exception Indicators */
+.exception-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.exception-indicator.holiday {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.exception-indicator.vacation {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.exception-indicator.sick {
+    background: #fce7f3;
+    color: #be185d;
+}
+
+/* ===== AMÉLIORATIONS TABLEAU EXCEPTIONS ===== */
+
+/* Ligne de groupe d'exceptions */
+.exception-group-row {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #6c757d;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.exception-group-row:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.exception-group-row.expanded {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-left-color: #f39c12;
+}
+
+/* Animation du chevron */
+.toggle-icon {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    color: #6c757d;
+}
+
+.exception-group-row:hover .toggle-icon {
+    color: #495057;
+}
+
+.exception-group-row.expanded .toggle-icon {
+    transform: rotate(90deg);
+    color: #f39c12;
+}
+
+/* Lignes enfants des exceptions */
+.exception-child-row {
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.exception-child-row:hover {
+    background-color: #f8f9fa;
+    border-left-color: #dee2e6;
+}
+
+/* Badges d'absence améliorés */
+.badge.bg-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.badge.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%) !important;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.badge.bg-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important;
+    box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
+}
+
+.badge.bg-success {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%) !important;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #545b62 100%) !important;
+    box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
+}
+
+/* Amélioration des boutons d'action */
+.btn-group-sm .btn {
+    transition: all 0.2s ease;
+}
+
+.btn-group-sm .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Action Count Badge */
+.action-count {
+    background: #3b82f6;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Tooltips */
+.planning-tooltip {
+    position: fixed;
+    background: #1f2937;
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    max-width: 300px;
+}
+
+.planning-tooltip.show {
+    opacity: 1;
+}
+
+.tooltip-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #374151;
+}
+
+.tooltip-action {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    padding: 2px 0;
+}
+
+.tooltip-action:last-child {
+    margin-bottom: 0;
+}
+
+.tooltip-footer {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #374151;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-align: center;
+}
+
+/* Modal Enhancements */
+.action-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+}
+
+.action-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.action-card:last-child {
+    margin-bottom: 0;
+}
+
+.action-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.action-title {
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+}
+
+.action-number {
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.action-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.action-detail {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.priority-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.priority-1 {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.priority-2 {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.priority-3 {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .planning-day-header {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+    
+    .planning-day-info {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .workload-bar {
+        height: 32px;
+    }
+    
+    .workload-label {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .planning-day-body {
+        padding: 12px;
+    }
+    
+    .action-details {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .planning-tooltip {
+        max-width: 250px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Loading States */
+.planning-skeleton {
+    background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 2s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Summary Cards */
+.week-summary .border-end:last-child {
+    border-right: none !important;
+}
+
+/* Non-working days */
+.planning-day.non-working {
+    opacity: 0.6;
+    background: #f9fafb;
+}
+
+.planning-day.non-working .planning-day-header {
+    background: #f3f4f6;
+}
+
+.planning-day.non-working .workload-bar {
+    background: #f9fafb;
+    border: 1px solid #f3f4f6;
+}
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+} 
+
+/* Responsive pour le tableau d'exceptions */
+@media (max-width: 768px) {
+    .exception-group-row .btn-group {
+        flex-direction: column;
+    }
+    
+    .exception-child-row .btn-group {
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .text-wrap {
+        max-width: 150px !important;
+    }
+} 
+
+.action-segment:hover {
+    filter: brightness(1.1);
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+.action-continuation {
+    border-top: 2px dashed rgba(255, 255, 255, 0.7);
+    filter: brightness(0.95);
+}
+
+.planning-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+} 

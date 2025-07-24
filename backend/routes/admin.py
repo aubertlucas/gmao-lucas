@@ -9,13 +9,17 @@ from PIL import Image
 import io
 import base64
 import random
-
+import json
 from database import get_db
 from models import User, Action
 from schemas import StorageInfo, ImageCompressionPreview, ImageCompressionResult, ImageCompressionPreviewRequest
 from utils.auth import get_current_user, get_password_hash
+from utils.delay_tolerance import is_action_overdue_with_tolerance, load_delay_tolerance_config
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+class DelayToleranceRequest(BaseModel):
+    enabled: bool
 
 # --- Configuration des chemins ---
 # Utilisation de chemins absolus pour être indépendant du répertoire de lancement
@@ -75,7 +79,13 @@ async def recalculate_overdue_flags_endpoint(
             if not deadline:
                 continue
 
-            is_overdue_correct = action.completion_date > deadline
+            # Utiliser la nouvelle logique avec tolérance
+            is_overdue_correct = is_action_overdue_with_tolerance(
+                action.completion_date, 
+                deadline, 
+                action.assigned_to, 
+                db
+            )
             
             if action.was_overdue_on_completion != is_overdue_correct:
                 log_messages.append(f"  Mise à jour Action ID {action.id}: '{action.title[:30]}...' -> en retard de '{action.was_overdue_on_completion}' à '{is_overdue_correct}'")
@@ -300,3 +310,171 @@ async def reset_password(
     print(f"[INFO] Mot de passe réinitialisé pour l'utilisateur {user.username} (ID: {user.id}) par l'admin {current_user.username}")
     
     return {"message": f"Mot de passe réinitialisé avec succès pour {user.username}"}
+
+@router.get("/user-working-hours/{user_id}")
+async def get_user_working_hours(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Récupère les heures de travail moyennes par jour pour un utilisateur.
+    Utilisé pour le calcul de tolérance côté frontend.
+    """
+    try:
+        from utils.delay_tolerance import get_user_working_hours_per_day
+        working_hours = get_user_working_hours_per_day(user_id, db)
+        
+        return {
+            "user_id": user_id,
+            "working_hours_per_day": working_hours,
+            "tolerance_hours": working_hours
+        }
+    except Exception as e:
+        print(f"Erreur lors du calcul des heures de travail: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {e}")
+
+@router.get("/all-users-working-hours")
+async def get_all_users_working_hours(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Récupère les heures de travail pour tous les utilisateurs.
+    Optimisé pour le calcul de tolérance côté frontend.
+    """
+    try:
+        from utils.delay_tolerance import get_user_working_hours_per_day
+        
+        # Récupérer tous les utilisateurs actifs
+        users = db.query(User).filter(User.is_active == True).all()
+        
+        working_hours_map = {}
+        for user in users:
+            working_hours = get_user_working_hours_per_day(user.id, db)
+            working_hours_map[user.id] = {
+                "user_id": user.id,
+                "username": user.username,
+                "working_hours_per_day": working_hours,
+                "tolerance_hours": working_hours
+            }
+        
+        return {"users_working_hours": working_hours_map}
+        
+    except Exception as e:
+        print(f"Erreur lors du calcul des heures de travail: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {e}")
+
+@router.post("/toggle-delay-tolerance", status_code=status.HTTP_200_OK)
+async def toggle_delay_tolerance(
+    request: DelayToleranceRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Active ou désactive la tolérance de retard et recalcule automatiquement les indicateurs.
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
+    
+    try:
+        # Charger la configuration actuelle
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Mettre à jour la configuration
+        if 'delayToleranceSettings' not in config:
+            config['delayToleranceSettings'] = {
+                "description": "Lissage des retards à la journée de travail près",
+                "enabled": False,
+                "toleranceType": "working_day"
+            }
+        
+        old_state = config['delayToleranceSettings'].get('enabled', False)
+        config['delayToleranceSettings']['enabled'] = request.enabled
+        config['delayToleranceEnabled'] = request.enabled  # Raccourci pour compatibilité
+        
+        # Sauvegarder la configuration
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+        
+        # Si l'état a changé, recalculer automatiquement les indicateurs de retard
+        if old_state != request.enabled:
+            print(f"[TOLERANCE] Tolérance {'activée' if request.enabled else 'désactivée'} par {current_user.username}, recalcul en cours...")
+            
+            # Récupérer toutes les actions terminées
+            completed_actions = db.query(Action).filter(
+                Action.final_status == "OK",
+                Action.completion_date.isnot(None)
+            ).all()
+            
+            updated_count = 0
+            log_messages = []
+            
+            for action in completed_actions:
+                if not action.completion_date:
+                    continue
+
+                deadline = action.predicted_end_date if action.predicted_end_date else action.planned_date
+                if not deadline:
+                    continue
+
+                # Utiliser la nouvelle logique avec tolérance
+                is_overdue_correct = is_action_overdue_with_tolerance(
+                    action.completion_date, 
+                    deadline, 
+                    action.assigned_to, 
+                    db
+                )
+                
+                if action.was_overdue_on_completion != is_overdue_correct:
+                    # Log pour l'interface utilisateur (sans détails sensibles)
+                    log_messages.append(f"Action #{action.number}: {'EN RETARD' if is_overdue_correct else 'À TEMPS'}")
+                    action.was_overdue_on_completion = is_overdue_correct
+                    updated_count += 1
+            
+            if updated_count > 0:
+                db.commit()
+                print(f"[TOLERANCE] Recalcul terminé: {updated_count} actions mises à jour par {current_user.username}")
+            else:
+                print(f"[TOLERANCE] Aucune action à mettre à jour pour {current_user.username}")
+            
+            return {
+                "message": f"Tolérance {'activée' if request.enabled else 'désactivée'} avec succès",
+                "recalculated": True,
+                "updated_actions": updated_count,
+                "log": log_messages[:10],  # Limiter les logs affichés dans l'interface
+                "admin_user": current_user.username  # Identifier qui a fait l'action
+            }
+        else:
+            return {
+                "message": f"Tolérance déjà {'activée' if request.enabled else 'désactivée'}",
+                "recalculated": False
+            }
+            
+    except Exception as e:
+        print(f"Erreur lors du toggle de tolérance: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {e}")
+
+@router.get("/delay-tolerance-status")
+async def get_delay_tolerance_status(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Récupère le statut actuel de la tolérance de retard.
+    """
+    try:
+        config = load_delay_tolerance_config()
+        
+        return {
+            "enabled": config.get('enabled', False),
+            "description": config.get('description', ''),
+            "toleranceType": config.get('toleranceType', 'working_day')
+        }
+    except Exception as e:
+        return {
+            "enabled": False,
+            "error": str(e)
+        }
+

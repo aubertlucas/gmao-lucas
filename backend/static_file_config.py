@@ -45,8 +45,9 @@ def setup_static_files(app):
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allow_headers=["*"],
+        expose_headers=["*"],
     )
 
     print("CORS middleware configuré pour les origines:", origins)

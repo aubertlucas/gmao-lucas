@@ -1,3 +1,10 @@
 {
-    "photosFolder": "uploads/photos"
+    "photosFolder": "uploads/photos",
+    "delayToleranceEnabled": true,
+    "delayToleranceSettings": {
+        "description": "Lissage des retards à la journée de travail près",
+        "enabled": true,
+        "toleranceType": "working_day",
+        "comment": "Si activé, une action terminée avec moins d'une journée de retard par rapport au planning utilisateur sera considérée comme à temps"
+    }
 }

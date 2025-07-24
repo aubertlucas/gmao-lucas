@@ -9,7 +9,7 @@ import shutil
 
 from database import engine, Base, get_db
 from models import User, Action, Location, ActionPhoto, WorkCalendar, WorkSchedule, CalendarException
-from routes import auth, actions, photos, dashboard, config, calendar, users, db_viewer, admin
+from routes import auth, actions, photos, dashboard, config, calendar, users, db_viewer, admin, planning
 from routes.auth import users_router as auth_users_router
 from utils.auth import get_password_hash
 from utils.image_utils import compress_image
@@ -114,6 +114,7 @@ app.include_router(photos.router)
 app.include_router(dashboard.router)
 app.include_router(config.router)
 app.include_router(calendar.router)
+app.include_router(planning.router)
 # Inverser l'ordre pour que users.router ait la priorité sur auth_users_router
 app.include_router(users.router, prefix="/users")
 app.include_router(auth_users_router, prefix="/auth/users")  # Déplacer vers un autre préfixe pour éviter les conflits

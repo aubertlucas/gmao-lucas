@@ -903,10 +903,40 @@ DOM:
             
             // Récupérer les statistiques du tableau de bord
             const dashboardStats = await this.apiService.getDashboardStats(this.selectedPilotId);
-            this.stats = dashboardStats;
             
-            // --- DEBUG: Affiche les stats reçues ---
-            console.log('[DEBUG] Stats reçues du backend:', this.stats);
+            // --- TOLÉRANCE : Recalculer les stats si l'option est activée ---
+            if (ToleranceUtils.isToleranceEnabled()) {
+                console.log('[TOLERANCE] Tolérance activée, recalcul des statistiques...');
+                
+                // Récupérer les actions filtrées pour l'utilisateur sélectionné (comme le backend)
+                const filters = {};
+                if (this.selectedPilotId) {
+                    filters.assigned_to = this.selectedPilotId;
+                }
+                
+                const allActions = await this.apiService.getActions(filters);
+                console.log('[TOLERANCE] Actions récupérées pour le recalcul:', allActions.length, 'actions');
+                
+                // Recalculer avec tolérance
+                const recalculatedStats = await ToleranceUtils.recalculateAllStats(allActions, this.apiService);
+                
+                // Garder certaines stats du backend et remplacer les autres
+                this.stats = {
+                    ...dashboardStats,
+                    ...recalculatedStats,
+                    // Garder les stats totales du backend
+                    total_actions: dashboardStats.total_actions,
+                    completed_actions: dashboardStats.completed_actions,
+                    in_progress_actions: dashboardStats.in_progress_actions
+                };
+                
+                console.log('[TOLERANCE] Stats recalculées:', this.stats);
+            } else {
+                this.stats = dashboardStats;
+            }
+            
+            // --- DEBUG: Affiche les stats finales ---
+            console.log('[DEBUG] Stats finales utilisées:', this.stats);
             
             // Récupérer les actions récentes et critiques
             const criticalActions = await this.apiService.getDashboardAlerts();
@@ -927,8 +957,11 @@ DOM:
             
             this.hideLoading();
             
-            // Notification de succès
-            showToast('Tableau de bord mis à jour', 'success');
+            // Notification de succès avec indicateur de tolérance
+            const toleranceMessage = ToleranceUtils.isToleranceEnabled() ? 
+                'Tableau de bord mis à jour (avec tolérance)' : 
+                'Tableau de bord mis à jour';
+            showToast(toleranceMessage, 'success');
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             showToast('Erreur lors du chargement des données', 'error');
@@ -942,6 +975,11 @@ DOM:
             const element = document.getElementById(id);
             if (element) {
                 element.textContent = value !== undefined ? value : defaultValue;
+                
+                // Ajouter l'indicateur de tolérance si nécessaire
+                if (ToleranceUtils.isToleranceEnabled()) {
+                    ToleranceUtils.addToleranceIndicator(element.parentElement);
+                }
             }
         };
         
@@ -958,6 +996,14 @@ DOM:
         
         updateElement('onTimeCount', onTimeCount);
         updateElement('lateCount', lateCount);
+        
+        // Ajouter un indicateur global de tolérance dans le titre si activée
+        if (ToleranceUtils.isToleranceEnabled()) {
+            const dashboardTitle = document.querySelector('h1, .dashboard-title');
+            if (dashboardTitle) {
+                ToleranceUtils.addToleranceIndicator(dashboardTitle);
+            }
+        }
     }
     
     initCharts() {
@@ -1371,19 +1417,28 @@ DOM:
         // Graphique de performance globale (KPI principal)
         initializeChart('performanceChart', (canvas) => {
             console.log('[Dashboard] Initialisation performanceChart');
+            console.log('[Dashboard] this.stats au moment de la création du graphique:', this.stats);
             
             // Utiliser directement les données du backend
             const onTime = (this.stats.completed_on_time || 0) + (this.stats.in_progress_on_time || 0);
             const late = (this.stats.completed_overdue || 0) + (this.stats.in_progress_overdue || 0);
             const performancePercentage = this.stats.performance_percentage || 0;
             
+            console.log('[Dashboard] Valeurs calculées pour le graphique:', {
+                completed_on_time: this.stats.completed_on_time,
+                in_progress_on_time: this.stats.in_progress_on_time, 
+                completed_overdue: this.stats.completed_overdue,
+                in_progress_overdue: this.stats.in_progress_overdue,
+                onTime: onTime,
+                late: late,
+                performancePercentage: performancePercentage
+            });
+            
             // Rendre les détails disponibles pour l'infobulle
             const completedOnTime = this.stats.completed_on_time || 0;
             const completedOverdue = this.stats.completed_overdue || 0;
             const inProgressOnTime = this.stats.in_progress_on_time || 0;
             const inProgressOverdue = this.stats.in_progress_overdue || 0;
-            
-            console.log('[Dashboard] Données performance depuis this.stats:', { onTime, late, performancePercentage });
             
             return new Chart(canvas, {
         type: 'doughnut',
@@ -1516,7 +1571,34 @@ DOM:
         setTimeout(() => {
             console.log(`[Dashboard] ${Object.keys(this.charts).length} graphiques créés:`, Object.keys(this.charts));
             this.resizeAllCharts();
+            
+            // Ajouter les indicateurs de tolérance aux titres des graphiques si activée
+            if (ToleranceUtils.isToleranceEnabled()) {
+                this.addToleranceIndicatorsToCharts();
+            }
         }, 100);
+    }
+    
+    /**
+     * Ajoute des indicateurs de tolérance aux titres des graphiques
+     */
+    addToleranceIndicatorsToCharts() {
+        const chartTitles = [
+            { id: 'statusChart', selector: '[data-widget-type="statusChart"] .widget-title' },
+            { id: 'performanceChart', selector: '[data-widget-type="performanceChart"] .widget-title' },
+            { id: 'priorityChart', selector: '[data-widget-type="priorityChart"] .widget-title' },
+            { id: 'locationChart', selector: '[data-widget-type="locationChart"] .widget-title' },
+            { id: 'costChart', selector: '[data-widget-type="costChart"] .widget-title' }
+        ];
+        
+        chartTitles.forEach(chart => {
+            const titleElement = document.querySelector(chart.selector);
+            if (titleElement) {
+                ToleranceUtils.addToleranceIndicator(titleElement);
+            }
+        });
+        
+        console.log('[TOLERANCE] Indicateurs ajoutés aux graphiques');
     }
     
     /**
@@ -2586,4 +2668,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     `;
     document.head.appendChild(style);
+    
+    // Exposer une fonction publique pour rafraîchir le dashboard
+    // Utilisée quand l'utilisateur change ses préférences de tolérance
+    window.refreshDashboardWithTolerance = function() {
+        if (window.dashboard) {
+            console.log('[TOLERANCE] Rafraîchissement du dashboard demandé');
+            window.dashboard.loadDashboardData();
+        }
+    };
 });
